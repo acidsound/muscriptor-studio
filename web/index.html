@@ -1,0 +1,457 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b0e10">
+  <title>MuScriptor Studio</title>
+  <style>
+    :root {
+      --canvas: #0b0e10;
+      --surface-1: #11161a;
+      --surface-2: #171e23;
+      --surface-3: #20292f;
+      --line: #2a353b;
+      --line-strong: #3b484f;
+      --text: #eef2ef;
+      --muted: #8b9793;
+      --faint: #5f6a67;
+      --ai: #ff795f;
+      --audio: #e4b05a;
+      --midi: #55d0c0;
+      --success: #86d66d;
+      --danger: #ff646b;
+      --shadow: 0 18px 60px rgba(0, 0, 0, .24);
+      --radius: 6px;
+      --mono: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+      --sans: Pretendard, "Noto Sans KR", Inter, ui-sans-serif, system-ui, sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { min-height: 100%; }
+    body {
+      margin: 0;
+      background: var(--canvas);
+      color: var(--text);
+      font-family: var(--sans);
+      font-size: 13px;
+      letter-spacing: .01em;
+    }
+    button, input, textarea, select { font: inherit; }
+    button { color: inherit; }
+    button:focus-visible, textarea:focus-visible, select:focus-visible {
+      outline: 2px solid var(--ai);
+      outline-offset: 2px;
+    }
+
+    .app-shell { min-height: 100vh; display: grid; grid-template-rows: 58px 1fr 28px; }
+    .topbar {
+      display: grid;
+      grid-template-columns: 230px minmax(150px, 1fr) auto minmax(320px, 1fr);
+      align-items: center;
+      gap: 18px;
+      padding: 0 18px;
+      border-bottom: 1px solid var(--line);
+      background: #0e1214;
+    }
+    .brand-block, .top-meta, .transport, .project-title, .panel-title, .toolbar, .detail-heading, .statusbar {
+      display: flex;
+      align-items: center;
+    }
+    .brand-block { gap: 10px; min-width: 0; }
+    .brand-mark {
+      width: 27px; height: 27px; border: 1px solid var(--ai); border-radius: 5px;
+      display: grid; place-items: center; position: relative; overflow: hidden;
+      background: rgba(255, 121, 95, .08);
+    }
+    .brand-mark::before, .brand-mark::after {
+      content: ""; position: absolute; height: 1px; background: var(--ai); transform: rotate(-28deg);
+    }
+    .brand-mark::before { width: 28px; top: 9px; left: -2px; }
+    .brand-mark::after { width: 28px; top: 16px; left: 1px; opacity: .55; }
+    .brand-name { font-size: 13px; font-weight: 650; letter-spacing: .04em; white-space: nowrap; }
+    .brand-sub { color: var(--muted); font: 10px var(--mono); text-transform: uppercase; letter-spacing: .12em; }
+    .project-title { gap: 9px; color: var(--muted); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; min-width: 0; }
+    .project-title strong { color: var(--text); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .autosave { color: var(--success); font: 10px var(--mono); white-space: nowrap; }
+    .transport { gap: 4px; justify-content: center; }
+    .icon-button, .transport-button, .button {
+      border: 1px solid transparent; background: transparent; min-height: 30px; border-radius: 4px;
+      cursor: pointer; transition: background .15s ease, border-color .15s ease, color .15s ease;
+    }
+    .icon-button, .transport-button { min-width: 30px; padding: 0 8px; color: var(--muted); }
+    .icon-button:hover, .transport-button:hover, .button:hover { background: var(--surface-3); color: var(--text); border-color: var(--line-strong); }
+    .transport-button.play { width: 38px; color: var(--canvas); background: var(--text); border-color: var(--text); font-size: 15px; }
+    .transport-button.play:hover { background: var(--ai); border-color: var(--ai); }
+    .timecode { margin: 0 9px; font: 12px var(--mono); color: var(--text); min-width: 94px; text-align: center; }
+    .top-meta { justify-content: flex-end; gap: 9px; }
+    .metric { min-width: 48px; padding: 4px 7px; border-left: 1px solid var(--line); color: var(--text); font: 12px var(--mono); }
+    .metric small { display: block; color: var(--faint); font: 9px var(--mono); letter-spacing: .08em; }
+    .runtime-pill, .deployment-chip, .status-pill {
+      display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: 999px;
+      padding: 5px 9px; color: var(--muted); font: 10px var(--mono); white-space: nowrap;
+    }
+    .runtime-pill::before, .deployment-chip::before, .status-pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--faint); }
+    .runtime-pill.ready, .status-pill.ready { color: var(--success); border-color: rgba(134, 214, 109, .35); }
+    .runtime-pill.ready::before, .status-pill.ready::before { background: var(--success); }
+    .runtime-pill.remote { color: var(--ai); border-color: rgba(255, 121, 95, .45); }
+    .runtime-pill.remote::before { background: var(--ai); }
+    .button { padding: 0 11px; border-color: var(--line); background: var(--surface-2); font-size: 11px; }
+    .button.primary { background: var(--ai); border-color: var(--ai); color: #1c100d; font-weight: 700; }
+    .button.primary:hover { background: #ff957f; border-color: #ff957f; }
+    .button.ghost { background: transparent; border-color: transparent; }
+
+    .studio-grid { min-height: 0; display: grid; grid-template-columns: 210px minmax(520px, 1fr) 302px; }
+    .panel { background: var(--surface-1); min-height: 0; }
+    .track-panel { border-right: 1px solid var(--line); padding: 15px 10px; }
+    .inspector { border-left: 1px solid var(--line); padding: 0; overflow: auto; }
+    .panel-title { justify-content: space-between; padding: 0 7px 14px; color: var(--muted); font: 10px var(--mono); letter-spacing: .14em; }
+    .panel-title .icon-button { font-size: 18px; line-height: 1; color: var(--text); }
+    .track-group { margin: 6px 0 18px; }
+    .group-label { padding: 0 7px 7px; color: var(--faint); font: 9px var(--mono); letter-spacing: .14em; text-transform: uppercase; }
+    .track-row { width: 100%; display: grid; grid-template-columns: 22px 1fr auto; align-items: center; gap: 8px; padding: 9px 7px; border: 1px solid transparent; border-radius: 4px; background: transparent; cursor: pointer; text-align: left; }
+    .track-row:hover { background: var(--surface-2); }
+    .track-row.active { background: var(--surface-3); border-color: var(--line-strong); }
+    .track-icon { display: grid; place-items: center; width: 20px; height: 20px; border: 1px solid currentColor; border-radius: 3px; font: 9px var(--mono); }
+    .track-row.audio .track-icon { color: var(--audio); }
+    .track-row.midi .track-icon { color: var(--midi); }
+    .track-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+    .track-type { color: var(--faint); font: 9px var(--mono); }
+    .track-controls { display: flex; gap: 4px; padding: 6px 7px 0 37px; }
+    .mini-control { width: 22px; height: 20px; padding: 0; border: 1px solid var(--line); border-radius: 3px; color: var(--muted); background: transparent; font: 9px var(--mono); cursor: pointer; }
+    .mini-control:hover { color: var(--text); border-color: var(--line-strong); }
+    .mini-control.muted { color: var(--danger); border-color: rgba(255, 100, 107, .4); }
+    .new-track { width: 100%; margin-top: 4px; padding: 9px 7px; border: 1px dashed var(--line-strong); border-radius: 4px; color: var(--muted); background: transparent; text-align: left; cursor: pointer; }
+    .new-track:hover { color: var(--text); border-color: var(--ai); }
+
+    .main-stage { min-width: 0; min-height: 0; display: grid; grid-template-rows: 45px minmax(300px, 1fr) 258px; background: var(--canvas); }
+    .toolbar { justify-content: space-between; gap: 14px; padding: 0 15px; border-bottom: 1px solid var(--line); background: var(--surface-1); }
+    .segmented { display: flex; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
+    .segment { min-height: 27px; padding: 0 10px; border: 0; border-right: 1px solid var(--line); background: transparent; color: var(--muted); cursor: pointer; font-size: 11px; }
+    .segment:last-child { border-right: 0; }
+    .segment.active { background: var(--surface-3); color: var(--text); }
+    .toolbar-tools { display: flex; align-items: center; gap: 8px; color: var(--muted); }
+    .toolbar-label { font: 10px var(--mono); }
+    .zoom { width: 82px; accent-color: var(--ai); }
+
+    .timeline { position: relative; overflow: auto; background-color: var(--canvas); background-image: linear-gradient(to right, rgba(255,255,255,.045) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,.035) 1px, transparent 1px); background-size: calc(100% / 16) 100%, 100% 67px; }
+    .ruler { height: 33px; display: grid; grid-template-columns: repeat(16, minmax(52px, 1fr)); align-items: end; border-bottom: 1px solid var(--line); background: rgba(17, 22, 26, .88); min-width: 832px; }
+    .bar-number { height: 22px; padding-left: 7px; border-left: 1px solid var(--line); color: var(--faint); font: 10px var(--mono); }
+    .bar-number:nth-child(4n + 1) { color: var(--muted); }
+    .lane { position: relative; display: grid; grid-template-columns: repeat(16, minmax(52px, 1fr)); min-width: 832px; height: 67px; border-bottom: 1px solid rgba(42, 53, 59, .65); }
+    .lane-name { position: absolute; left: 8px; top: 7px; z-index: 2; color: var(--faint); font: 9px var(--mono); pointer-events: none; }
+    .clip { position: relative; z-index: 1; align-self: center; height: 43px; margin: 0 3px; padding: 7px 9px; overflow: hidden; border-radius: 4px; cursor: pointer; transition: filter .15s ease, transform .15s ease; }
+    .clip:hover { filter: brightness(1.13); transform: translateY(-1px); }
+    .clip.audio { grid-column: 2 / span 6; border: 1px solid rgba(228, 176, 90, .58); background: linear-gradient(180deg, rgba(228,176,90,.25), rgba(228,176,90,.11)); color: #f7d798; }
+    .clip.midi { grid-column: 3 / span 5; border: 1px solid rgba(85, 208, 192, .58); background: linear-gradient(180deg, rgba(85,208,192,.23), rgba(85,208,192,.08)); color: #9af0e5; }
+    .clip.demo-hidden { opacity: .38; }
+    .clip-label { position: relative; z-index: 2; display: flex; justify-content: space-between; gap: 5px; font-size: 11px; font-weight: 650; }
+    .clip-meta { position: relative; z-index: 2; margin-top: 6px; color: inherit; opacity: .68; font: 9px var(--mono); }
+    .waveform { position: absolute; left: 0; right: 0; bottom: 3px; height: 21px; opacity: .6; background: repeating-linear-gradient(90deg, transparent 0 4px, currentColor 4px 5px, transparent 5px 8px); clip-path: polygon(0 55%, 3% 42%, 6% 70%, 9% 30%, 12% 62%, 15% 18%, 18% 72%, 21% 40%, 24% 78%, 28% 25%, 31% 58%, 34% 34%, 37% 68%, 40% 17%, 43% 59%, 46% 45%, 50% 74%, 54% 31%, 58% 69%, 62% 24%, 66% 53%, 70% 42%, 74% 72%, 78% 20%, 82% 60%, 86% 37%, 90% 72%, 94% 31%, 98% 55%, 100% 42%, 100% 100%, 0 100%); }
+    .midi-notes { position: absolute; inset: 17px 8px 5px; opacity: .85; background: repeating-linear-gradient(90deg, transparent 0 15px, rgba(85,208,192,.82) 15px 23px, transparent 23px 34px); clip-path: polygon(0 72%, 8% 72%, 8% 34%, 16% 34%, 16% 54%, 24% 54%, 24% 16%, 32% 16%, 32% 65%, 42% 65%, 42% 40%, 50% 40%, 50% 76%, 60% 76%, 60% 24%, 69% 24%, 69% 58%, 77% 58%, 77% 11%, 88% 11%, 88% 45%, 100% 45%, 100% 100%, 0 100%); }
+    .playhead { position: absolute; top: 0; bottom: 0; left: 34%; width: 1px; z-index: 5; background: var(--ai); box-shadow: 0 0 10px rgba(255,121,95,.55); pointer-events: none; transition: left .08s linear; }
+    .playhead::before { content: ""; position: absolute; top: 0; left: -4px; width: 9px; height: 9px; background: var(--ai); clip-path: polygon(0 0, 100% 0, 50% 100%); }
+
+    .detail-editor { min-height: 0; border-top: 1px solid var(--line); background: var(--surface-1); }
+    .detail-heading { justify-content: space-between; height: 42px; padding: 0 14px; border-bottom: 1px solid var(--line); }
+    .detail-title { display: flex; align-items: baseline; gap: 9px; }
+    .eyebrow { color: var(--faint); font: 9px var(--mono); letter-spacing: .12em; text-transform: uppercase; }
+    .detail-title strong { font-size: 12px; font-weight: 600; }
+    .editor-tabs { display: flex; gap: 3px; }
+    .editor-tab { border: 0; border-bottom: 1px solid transparent; padding: 7px 8px; color: var(--muted); background: transparent; cursor: pointer; font-size: 11px; }
+    .editor-tab.active { color: var(--text); border-bottom-color: var(--ai); }
+    .piano-roll { display: grid; grid-template-columns: 42px 1fr; height: calc(100% - 42px); min-height: 180px; overflow: hidden; }
+    .piano-keys { display: grid; grid-template-rows: repeat(8, 1fr); border-right: 1px solid var(--line); background: var(--surface-2); }
+    .key { padding: 5px 7px; border-bottom: 1px solid var(--line); color: var(--faint); font: 9px var(--mono); }
+    .note-grid { position: relative; background-image: linear-gradient(to right, rgba(255,255,255,.065) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,.065) 1px, transparent 1px); background-size: calc(100% / 16) 100%, 100% 25%; }
+    .note { position: absolute; height: 14px; border: 1px solid rgba(85,208,192,.9); border-radius: 2px; background: var(--midi); box-shadow: 0 0 9px rgba(85,208,192,.16); }
+    .note.n1 { left: 10%; top: 18%; width: 9%; }.note.n2 { left: 20%; top: 43%; width: 12%; }.note.n3 { left: 34%; top: 31%; width: 8%; }.note.n4 { left: 45%; top: 68%; width: 13%; }.note.n5 { left: 60%; top: 18%; width: 10%; }.note.n6 { left: 74%; top: 43%; width: 15%; }
+
+    .inspector-tabs { display: grid; grid-template-columns: 1fr 1fr; border-bottom: 1px solid var(--line); }
+    .inspector-tab { height: 45px; border: 0; border-bottom: 1px solid transparent; background: var(--surface-1); color: var(--muted); cursor: pointer; font: 10px var(--mono); letter-spacing: .1em; text-transform: uppercase; }
+    .inspector-tab.active { color: var(--text); border-bottom-color: var(--ai); background: var(--surface-2); }
+    .inspector-body { padding: 20px 17px; }
+    .inspector-body h1 { margin: 7px 0 7px; font-size: 20px; line-height: 1.1; font-weight: 620; letter-spacing: -.03em; }
+    .inspector-body p { margin: 0 0 20px; color: var(--muted); font-size: 11px; line-height: 1.5; }
+    .field-label { display: block; margin: 0 0 7px; color: var(--faint); font: 9px var(--mono); letter-spacing: .12em; }
+    textarea, select { width: 100%; color: var(--text); border: 1px solid var(--line); border-radius: 4px; background: var(--surface-2); }
+    textarea { min-height: 94px; padding: 10px; resize: vertical; line-height: 1.45; }
+    textarea::placeholder { color: var(--faint); }
+    select { height: 34px; padding: 0 8px; }
+    .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 13px 0; }
+    .generate-button { width: 100%; height: 40px; margin-top: 4px; }
+    .shortcut { float: right; color: rgba(28,16,13,.65); font: 9px var(--mono); }
+    .queue-card, .selected-card { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }
+    .queue-line { display: flex; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 11px; }
+    .queue-line strong { color: var(--text); font-weight: 550; }
+    .progress-track { height: 3px; margin: 10px 0 8px; background: var(--surface-3); overflow: hidden; }
+    .progress-value { width: 8%; height: 100%; background: var(--ai); transition: width .35s ease; }
+    .queue-note { color: var(--faint); font: 9px var(--mono); line-height: 1.45; }
+    .selected-card { color: var(--muted); }
+    .selected-card .card-title { display: flex; justify-content: space-between; color: var(--text); font-size: 12px; }
+    .card-details { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+    .card-details span { display: block; color: var(--faint); font: 9px var(--mono); }
+    .card-details strong { display: block; margin-top: 3px; color: var(--muted); font-size: 11px; font-weight: 500; }
+
+    .statusbar { justify-content: space-between; gap: 10px; padding: 0 12px; border-top: 1px solid var(--line); background: #0e1214; color: var(--faint); font: 9px var(--mono); }
+    .statusbar-left, .statusbar-right { display: flex; align-items: center; gap: 12px; min-width: 0; }
+    .status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--faint); }
+    .status-dot.ok { background: var(--success); }
+    .status-dot.warn { background: var(--ai); }
+    .toast { position: fixed; right: 18px; bottom: 44px; max-width: 320px; padding: 11px 13px; border: 1px solid var(--line-strong); border-radius: 5px; background: var(--surface-2); color: var(--text); box-shadow: var(--shadow); opacity: 0; transform: translateY(7px); pointer-events: none; transition: opacity .18s ease, transform .18s ease; font-size: 11px; }
+    .toast.show { opacity: 1; transform: translateY(0); }
+
+    @media (max-width: 1120px) {
+      .topbar { grid-template-columns: 205px 1fr auto; }
+      .project-title { display: none; }
+      .top-meta { grid-column: 2 / 4; grid-row: 1; justify-self: end; }
+      .transport { grid-column: 2; grid-row: 1; justify-self: center; }
+      .studio-grid { grid-template-columns: 178px minmax(470px, 1fr); }
+      .inspector { display: none; }
+    }
+    @media (max-width: 720px) {
+      .app-shell { grid-template-rows: 54px 1fr 28px; }
+      .topbar { grid-template-columns: 1fr auto; padding: 0 10px; }
+      .brand-sub, .metric, .runtime-pill { display: none; }
+      .transport { grid-column: 2; grid-row: 1; }
+      .top-meta { display: none; }
+      .studio-grid { grid-template-columns: 1fr; }
+      .track-panel { display: none; }
+      .main-stage { grid-template-rows: 45px minmax(300px, 1fr) 245px; }
+      .statusbar-right { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand-block">
+        <div class="brand-mark" aria-hidden="true"></div>
+        <div>
+          <div class="brand-name">MuScriptor Studio</div>
+          <div class="brand-sub">Tactile Signal Studio</div>
+        </div>
+      </div>
+      <div class="project-title">
+        <strong>Untitled Signal Study</strong>
+        <span class="autosave">● saved</span>
+      </div>
+      <div class="transport" aria-label="Transport">
+        <button class="transport-button" title="Return to start">|◀</button>
+        <button class="transport-button" title="Previous bar">◀</button>
+        <button class="transport-button play" id="play-button" title="Play / pause">▶</button>
+        <button class="transport-button" title="Stop">■</button>
+        <span class="timecode" id="timecode">00:00.000</span>
+      </div>
+      <div class="top-meta">
+        <div class="metric"><small>BPM</small>120</div>
+        <div class="metric"><small>METER</small>4/4</div>
+        <span class="runtime-pill" id="runtime-pill">Connecting</span>
+        <button class="button" id="export-button">Export</button>
+      </div>
+    </header>
+
+    <main class="studio-grid">
+      <aside class="track-panel panel">
+        <div class="panel-title"><span>TRACKS</span><button class="icon-button" id="add-track" title="Add track">+</button></div>
+        <div class="track-group">
+          <div class="group-label">Audio</div>
+          <button class="track-row audio active" data-track="audio-1">
+            <span class="track-icon">A</span><span class="track-name">AI Bass Loop</span><span class="track-type">AUDIO</span>
+          </button>
+          <div class="track-controls"><button class="mini-control" title="Mute">M</button><button class="mini-control" title="Solo">S</button><button class="mini-control" title="Volume">V</button></div>
+        </div>
+        <div class="track-group">
+          <div class="group-label">MIDI</div>
+          <button class="track-row midi" data-track="midi-1">
+            <span class="track-icon">M</span><span class="track-name">Bass MIDI</span><span class="track-type">MIDI</span>
+          </button>
+          <div class="track-controls"><button class="mini-control" title="Mute">M</button><button class="mini-control" title="Solo">S</button><button class="mini-control" title="Instrument">I</button></div>
+        </div>
+        <button class="new-track" id="new-track">+ Add track</button>
+      </aside>
+
+      <section class="main-stage">
+        <div class="toolbar">
+          <div class="segmented"><button class="segment active">Arrange</button><button class="segment">Clip</button></div>
+          <div class="toolbar-tools"><span class="toolbar-label">SNAP 1/16</span><span class="toolbar-label">ZOOM</span><input class="zoom" type="range" min="1" max="10" value="4" aria-label="Timeline zoom"></div>
+        </div>
+        <section class="timeline" aria-label="Arrangement timeline">
+          <div class="ruler">
+            <div class="bar-number">01</div><div class="bar-number">02</div><div class="bar-number">03</div><div class="bar-number">04</div>
+            <div class="bar-number">05</div><div class="bar-number">06</div><div class="bar-number">07</div><div class="bar-number">08</div>
+            <div class="bar-number">09</div><div class="bar-number">10</div><div class="bar-number">11</div><div class="bar-number">12</div>
+            <div class="bar-number">13</div><div class="bar-number">14</div><div class="bar-number">15</div><div class="bar-number">16</div>
+          </div>
+          <div class="lane"><span class="lane-name">AUDIO 01</span><div class="clip audio" id="audio-clip"><div class="clip-label"><span>AI Bass Loop</span><span>8.0s</span></div><div class="clip-meta">Stable Audio · 120 BPM target</div><div class="waveform"></div></div></div>
+          <div class="lane"><span class="lane-name">MIDI 01</span><div class="clip midi"><div class="clip-label"><span>Bass MIDI</span><span>🔗</span></div><div class="clip-meta">derived from AI Bass Loop</div><div class="midi-notes"></div></div></div>
+          <div class="playhead" id="playhead" aria-hidden="true"></div>
+        </section>
+        <section class="detail-editor">
+          <div class="detail-heading">
+            <div class="detail-title"><span class="eyebrow">DETAIL EDITOR</span><strong id="detail-title">AI Bass Loop</strong></div>
+            <div class="editor-tabs"><button class="editor-tab active" data-editor="piano">Piano Roll</button><button class="editor-tab" data-editor="waveform">Waveform</button></div>
+          </div>
+          <div class="piano-roll" id="piano-roll">
+            <div class="piano-keys"><div class="key">C5</div><div class="key">B4</div><div class="key">A4</div><div class="key">G4</div><div class="key">F4</div><div class="key">E4</div><div class="key">D4</div><div class="key">C4</div></div>
+            <div class="note-grid"><div class="note n1"></div><div class="note n2"></div><div class="note n3"></div><div class="note n4"></div><div class="note n5"></div><div class="note n6"></div></div>
+          </div>
+        </section>
+      </section>
+
+      <aside class="inspector panel">
+        <div class="inspector-tabs"><button class="inspector-tab active">Generate</button><button class="inspector-tab">Inspector</button></div>
+        <div class="inspector-body">
+          <div class="eyebrow">CREATE AUDIO CLIP</div>
+          <h1>Prompt the next layer.</h1>
+          <p>Generate a sound, place it on the timeline, then extract editable MIDI from the result.</p>
+          <form id="generate-form">
+            <label class="field-label" for="prompt">DESCRIPTION</label>
+            <textarea id="prompt" placeholder="warm analog bass loop, 120 BPM, four bars">warm analog bass loop, 120 BPM, four bars</textarea>
+            <div class="field-row">
+              <label><span class="field-label">DURATION</span><select id="duration"><option>4 sec</option><option selected>8 sec</option><option>16 sec · experimental</option></select></label>
+              <label><span class="field-label">TARGET</span><select><option selected>4 bars</option><option>8 bars</option><option>Free length</option></select></label>
+            </div>
+            <button class="button primary generate-button" type="submit" id="generate-button">Generate Audio <span class="shortcut">⌘ ↵</span></button>
+          </form>
+          <div class="queue-card">
+            <div class="queue-line"><strong id="queue-status">Ready to generate</strong><span id="queue-time">—</span></div>
+            <div class="progress-track"><div class="progress-value" id="progress-value"></div></div>
+            <div class="queue-note" id="queue-note">Model job wiring comes next. This first slice validates the Studio interaction and deployment shell.</div>
+          </div>
+          <div class="selected-card">
+            <div class="eyebrow">SELECTED CLIP</div>
+            <div class="card-title"><span>AI Bass Loop</span><span class="deployment-chip">AUDIO</span></div>
+            <div class="card-details"><div><span>MODEL</span><strong>Stable Audio Open</strong></div><div><span>STATUS</span><strong id="clip-status">Ready</strong></div><div><span>LINK</span><strong>Audio ↔ MIDI</strong></div><div><span>LENGTH</span><strong>8.0 seconds</strong></div></div>
+          </div>
+        </div>
+      </aside>
+    </main>
+
+    <footer class="statusbar">
+      <div class="statusbar-left"><span class="status-dot" id="health-dot"></span><span id="health-text">Checking server…</span><span id="runtime-text">Runtime pending</span></div>
+      <div class="statusbar-right"><span>SPACE Play</span><span>G Generate</span><span>Q Quantize</span><span>v0.1 shell</span></div>
+    </footer>
+  </div>
+  <div class="toast" id="toast" role="status"></div>
+
+  <script>
+    const $ = (selector) => document.querySelector(selector);
+    const toast = $('#toast');
+    let toastTimer;
+    let playing = false;
+    let playStart = 0;
+    let playElapsed = 0;
+    let frame;
+
+    function showToast(message) {
+      toast.textContent = message;
+      toast.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toast.classList.remove('show'), 2600);
+    }
+
+    function updateClock(seconds) {
+      const mins = Math.floor(seconds / 60).toString().padStart(2, '0');
+      const secs = (seconds % 60).toFixed(3).padStart(6, '0');
+      $('#timecode').textContent = `${mins}:${secs}`;
+    }
+
+    function animatePlay(now) {
+      if (!playing) return;
+      if (!playStart) playStart = now - playElapsed * 1000;
+      playElapsed = ((now - playStart) / 1000) % 32;
+      updateClock(playElapsed);
+      $('#playhead').style.left = `${12 + (playElapsed / 32) * 76}%`;
+      frame = requestAnimationFrame(animatePlay);
+    }
+
+    $('#play-button').addEventListener('click', () => {
+      playing = !playing;
+      $('#play-button').textContent = playing ? '❚❚' : '▶';
+      if (playing) { playStart = 0; frame = requestAnimationFrame(animatePlay); }
+      else cancelAnimationFrame(frame);
+    });
+
+    document.querySelectorAll('.track-row').forEach((row) => row.addEventListener('click', () => {
+      document.querySelectorAll('.track-row').forEach((item) => item.classList.remove('active'));
+      row.classList.add('active');
+      const isMidi = row.dataset.track === 'midi-1';
+      $('#detail-title').textContent = isMidi ? 'Bass MIDI' : 'AI Bass Loop';
+      showToast(`${isMidi ? 'MIDI' : 'Audio'} track selected`);
+    }));
+
+    document.querySelectorAll('.editor-tab').forEach((tab) => tab.addEventListener('click', () => {
+      document.querySelectorAll('.editor-tab').forEach((item) => item.classList.remove('active'));
+      tab.classList.add('active');
+      showToast(`${tab.textContent} editor selected`);
+    }));
+
+    $('#add-track').addEventListener('click', () => showToast('Track creation is next in the Studio slice.'));
+    $('#new-track').addEventListener('click', () => showToast('Track creation is next in the Studio slice.'));
+    $('#export-button').addEventListener('click', () => showToast('Export will be connected after the project model is in place.'));
+
+    $('#generate-form').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const button = $('#generate-button');
+      const status = $('#queue-status');
+      const note = $('#queue-note');
+      const progress = $('#progress-value');
+      const clipStatus = $('#clip-status');
+      button.disabled = true;
+      button.textContent = 'Generating…';
+      status.textContent = 'Prototype job running';
+      clipStatus.textContent = 'Generating';
+      note.textContent = 'The shell is exercising the real server/job boundary. Model inference is the next slice.';
+      progress.style.width = '24%';
+      try {
+        await fetch('/api/demo/generate', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({prompt: $('#prompt').value, duration: $('#duration').value})
+        });
+      } catch (_) {
+        note.textContent = 'Server response unavailable; the UI state is still local.';
+      }
+      setTimeout(() => {
+        progress.style.width = '100%';
+        status.textContent = 'Prototype ready';
+        $('#queue-time').textContent = 'demo';
+        clipStatus.textContent = 'Ready';
+        note.textContent = 'Ready for Stable Audio job wiring.';
+        button.disabled = false;
+        button.innerHTML = 'Generate Audio <span class="shortcut">⌘ ↵</span>';
+        showToast('Prototype job completed — ready for model wiring.');
+      }, 1250);
+    });
+
+    async function loadRuntime() {
+      try {
+        const [healthResponse, runtimeResponse] = await Promise.all([fetch('/api/health'), fetch('/api/runtime')]);
+        const health = await healthResponse.json();
+        const runtime = await runtimeResponse.json();
+        const isColab = runtime.deployment === 'colab-t4';
+        const label = isColab ? 'COLAB T4 · HTTPS' : `LOCAL · ${runtime.device.toUpperCase()}`;
+        $('#runtime-pill').textContent = label;
+        $('#runtime-pill').classList.add('ready');
+        if (isColab) $('#runtime-pill').classList.add('remote');
+        $('#health-dot').classList.add('ok');
+        $('#health-text').textContent = health.ok ? 'Studio server ready' : 'Studio server warning';
+        $('#runtime-text').textContent = `${runtime.device_name} · ${runtime.deployment}`;
+      } catch (error) {
+        $('#runtime-pill').textContent = 'SERVER OFFLINE';
+        $('#health-dot').classList.add('warn');
+        $('#health-text').textContent = 'Server unavailable';
+        $('#runtime-text').textContent = 'Check local or Colab deployment';
+      }
+    }
+
+    window.addEventListener('keydown', (event) => {
+      if (event.code === 'Space' && event.target.tagName !== 'TEXTAREA') { event.preventDefault(); $('#play-button').click(); }
+      if ((event.key === 'g' || event.key === 'G') && event.target.tagName !== 'TEXTAREA') { $('#prompt').focus(); }
+    });
+
+    loadRuntime();
+  </script>
+</body>
+</html>

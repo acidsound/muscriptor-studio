@@ -37,16 +37,16 @@ MuScriptor Studio is designed as a **DAW with AI inside**, not as a generic AI d
 
 See [the design language document](docs/design-language.md) for the initial visual and interaction system.
 
-## Runtime principle: local-first
+## Runtime and deployment principle
 
-MuScriptor Studio is fundamentally a **personal desktop application**.
+MuScriptor Studio is fundamentally a **personal desktop application**, with a matching Colab deployment for development and remote access.
 
-- Use a local GPU when one is available.
+- On a personal desktop, run the web app locally and use a local GPU when one is available.
 - Keep a CPU fallback so the project remains usable without a GPU.
 - Also provide a Colab T4 deployment that runs the Studio web app and model runtime on the T4 and exposes it through an HTTPS URL.
-- Keep the Studio UI, project format, clip model, and job contract independent from the deployment target.
+- Keep the Studio UI, project format, clip model, and job lifecycle independent from the deployment target.
 
-The default user experience should not require an account, a cloud deployment, or an always-on remote server. Colab is an additional way to host the same web app for temporary remote access. See [Deployment and Runtime Modes](docs/runtime-modes.md) for the execution and exposure model.
+The default user experience should not require an account, cloud deployment, or always-on remote server. Colab is an additional way to host the same web app for development and testing. See [Deployment and Runtime Modes](docs/runtime-modes.md).
 
 ## Current status
 
@@ -58,7 +58,14 @@ The model integration has been functionally validated on a real Colab Tesla T4:
 - Audio generation and transcription also ran concurrently in a smoke test
 - The tested path used one generation/transcription job at a time and 20 inference steps
 
-The local GPU and CPU paths are product requirements. Their performance and model-specific compatibility still need to be measured separately rather than inferred from the Colab result. The Colab HTTPS web-app deployment is the next integration milestone; the model smoke test alone does not verify the complete browser-accessible deployment.
+The first Studio shell has been validated as a browser-accessible web app on the Colab T4 deployment path:
+
+- Studio server health returned `200` through the HTTPS URL
+- Browser loaded the arrangement timeline, Audio/MIDI clips, Piano Roll, and Generate panel
+- Runtime status displayed `COLAB T4 · HTTPS` and `Tesla T4 · colab-t4`
+- Generate prototype interaction completed through the browser and returned a ready state
+
+The complete model-backed browser workflow is the next integration slice; the existing model smoke test and shell validation do not yet verify Stable Audio generation and MuScriptor extraction through the Studio UI.
 
 This repository is the product workspace. The upstream model fork is maintained separately at [`acidsound/muscriptor`](https://github.com/acidsound/muscriptor), currently using the `ui-improvements` branch for the verified model/UI work.
 
@@ -89,9 +96,46 @@ The application core is shared across deployment targets. Only the host and loca
 
 Inside either deployment, the runtime selects a local GPU when available and falls back to CPU when necessary. Colab is not a runtime selector inside the local Studio; it is a separate way to launch and expose the same web app. The first implementation should keep GPU work conservative with one Stable Audio generation at a time, serialized variations, and clear job states in the UI.
 
+## Run the Studio shell locally
+
+The first shell uses only Python's standard library for the server and has no frontend package-install step.
+
+```bash
+python3 server.py --host 127.0.0.1 --port 7860 --deployment desktop
+```
+
+Open `http://127.0.0.1:7860` in a browser. The shell exposes:
+
+- `GET /api/health`
+- `GET /api/runtime`
+- `GET /api/project`
+- `POST /api/demo/generate` (prototype interaction only; model wiring comes next)
+
+## Run the shell on Colab T4
+
+Upload the repository files to `/content/muscriptor-studio`, then run the scripts in order:
+
+```bash
+colab exec --session studio-t4 --file scripts/colab_start_studio.py --timeout 60
+colab exec --session studio-t4 --file scripts/colab_wait_for_studio.py --timeout 150
+colab exec --session studio-t4 --file scripts/colab_start_tunnel.py --timeout 180
+colab exec --session studio-t4 --file scripts/colab_wait_for_tunnel.py --timeout 120
+```
+
+The final script returns an HTTPS URL for the browser. Stop the app and tunnel before stopping the Colab session:
+
+```bash
+colab exec --session studio-t4 --file scripts/colab_stop_studio.py --timeout 60
+colab stop --session studio-t4
+```
+
+The deployment scripts are intentionally separate from the model installation scripts so the web shell can be validated before loading the large model weights.
+
 ## Initial roadmap
 
-- [ ] Create the Studio shell and dark design-token system
+- [x] Create the Studio shell and dark design-token system
+- [x] Add local/Colab web-server launch path
+- [x] Validate Studio shell browser access through Colab T4 HTTPS
 - [ ] Build the arrangement timeline with Audio and MIDI lanes
 - [ ] Add the Generate Audio drawer and job states
 - [ ] Insert generated audio into the timeline
@@ -100,8 +144,7 @@ Inside either deployment, the runtime selects a local GPU when available and fal
 - [ ] Link Audio and derived MIDI assets
 - [ ] Add WAV / MIDI / project export
 - [ ] Add local hardware detection and GPU/CPU runtime selection
-- [ ] Add local desktop web-app launch and browser workflow
-- [ ] Add Colab T4 deployment script: build, start, HTTPS tunnel, health check
+- [ ] Add full Colab T4 browser E2E verification
 - [ ] Add secure/persistent remote-access option beyond unauthenticated temporary tunnels
 - [ ] Stress-test longer clips, higher inference steps, and queue behavior
 
@@ -110,10 +153,18 @@ Inside either deployment, the runtime selects a local GPU when available and fal
 ```text
 .
 ├── README.md
-├── docs/
-│   ├── design-language.md
-│   └── runtime-modes.md
-└── (Studio application code will be added next)
+├── server.py
+├── web/
+│   └── index.html
+├── scripts/
+│   ├── colab_start_studio.py
+│   ├── colab_wait_for_studio.py
+│   ├── colab_start_tunnel.py
+│   ├── colab_wait_for_tunnel.py
+│   └── colab_stop_studio.py
+└── docs/
+    ├── design-language.md
+    └── runtime-modes.md
 ```
 
 ## Security and generated artifacts
@@ -123,14 +174,6 @@ Inside either deployment, the runtime selects a local GPU when available and fal
 - Do not put raw transcripts or private project assets in public issues or pull requests.
 - A temporary HTTPS tunnel may be publicly reachable and unauthenticated; use it only for controlled testing until an authentication and access-control layer is implemented.
 - Use short-lived runtime credentials and stop temporary Colab sessions and tunnels after validation.
-
-## Development notes
-
-The repository is intentionally starting with product documentation and design constraints before the full UI implementation. The next milestone is a verified Studio shell with three states:
-
-1. Empty Studio
-2. Studio with a generated Audio clip
-3. Studio with linked Audio and MIDI clips
 
 ## License
 
