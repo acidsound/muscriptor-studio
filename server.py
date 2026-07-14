@@ -1,19 +1,25 @@
 from __future__ import annotations
 
 import argparse
+import io
 import json
 import os
 import re
 import secrets
 import threading
 import uuid
+import zipfile
 from concurrent.futures import ThreadPoolExecutor
 from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from typing import Any
 from urllib.parse import unquote, urlparse
 
+from fixture_runtime import FixtureRuntime
+from midi_utils import encode_midi, parse_midi
 from model_runtime import ModelRuntime
+from project_store import ProjectStore
 
 ROOT = Path(__file__).resolve().parent
 STATIC_ROOT = ROOT / "web"
@@ -22,9 +28,15 @@ APP_VERSION = "0.2.0-inference"
 
 
 class JobManager:
-    def __init__(self, output_root: Path):
+    def __init__(
+        self,
+        output_root: Path,
+        runtime: Any | None = None,
+        project: ProjectStore | None = None,
+    ):
         self.output_root = output_root
-        self.runtime = ModelRuntime(output_root)
+        self.runtime = runtime or ModelRuntime(output_root)
+        self.project = project or ProjectStore(output_root)
         self._jobs: dict[str, dict[str, object]] = {}
         self._lock = threading.Lock()
         # T4 memory policy: one model job at a time.
@@ -42,6 +54,16 @@ class JobManager:
             raise ValueError("duration_seconds must be a number") from None
         if duration not in (4.0, 8.0, 16.0):
             raise ValueError("duration_seconds must be 4, 8, or 16")
+        target_value = request.get("target_bars")
+        target_text = "" if target_value is None else str(target_value).strip().lower()
+        if target_text in {"", "free", "none"}:
+            target_bars = None
+        elif target_text in {"4", "4.0"}:
+            target_bars = 4
+        elif target_text in {"8", "8.0"}:
+            target_bars = 8
+        else:
+            raise ValueError("target_bars must be 4, 8, or free")
         try:
             steps = int(request.get("steps", 20))
         except (TypeError, ValueError):
@@ -61,6 +83,7 @@ class JobManager:
             "message": "Queued for the single T4 inference worker",
             "prompt": prompt,
             "duration_seconds": duration,
+            "target_bars": target_bars,
             "steps": steps,
             "seed": seed,
             "result": None,
@@ -90,6 +113,18 @@ class JobManager:
                 update=lambda status, progress, message: self._update(
                     job_id, status, progress, message
                 ),
+            )
+            midi_path = self.output_root / job_id / "notes.mid"
+            try:
+                parsed_midi = parse_midi(midi_path.read_bytes())
+                midi_notes = parsed_midi["notes"]
+            except (OSError, ValueError):
+                midi_notes = []
+            self.project.insert_generation(
+                job_id=job_id,
+                prompt=str(job["prompt"]),
+                result=result,
+                notes=midi_notes,
             )
         except Exception as exc:
             with self._lock:
@@ -141,19 +176,14 @@ class JobManager:
         return value[:500]
 
 
-JOBS = JobManager(OUTPUT_ROOT)
+JOBS = JobManager(
+    OUTPUT_ROOT,
+    runtime=FixtureRuntime(OUTPUT_ROOT) if os.environ.get("STUDIO_RUNTIME") == "fixture" else None,
+)
 
 
 def project_snapshot() -> dict[str, object]:
-    return {
-        "name": "Untitled Signal Study",
-        "bpm": 120,
-        "time_signature": "4/4",
-        "tracks": [
-            {"id": "audio-1", "type": "audio", "name": "AI Bass Loop"},
-            {"id": "midi-1", "type": "midi", "name": "Bass MIDI"},
-        ],
-    }
+    return JOBS.project.snapshot()
 
 
 class StudioHandler(SimpleHTTPRequestHandler):
@@ -208,6 +238,55 @@ class StudioHandler(SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
+    def _send_bytes(self, data: bytes, content_type: str, filename: str | None = None) -> None:
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(data)))
+        self.send_header("Cache-Control", "no-store")
+        if filename:
+            self.send_header("Content-Disposition", f'attachment; filename="{filename}"')
+        self.end_headers()
+        self.wfile.write(data)
+
+    def _midi_json(self, clip_id: str) -> None:
+        try:
+            clip = JOBS.project.get_clip(clip_id)
+        except KeyError:
+            self._json({"ok": False, "error": "Clip not found"}, status=HTTPStatus.NOT_FOUND)
+            return
+        if clip.get("kind") != "midi":
+            self._json({"ok": False, "error": "Clip is not MIDI"}, status=HTTPStatus.BAD_REQUEST)
+            return
+        notes = clip.get("notes", [])
+        if not notes:
+            job_id = str(clip.get("job_id", ""))
+            path = OUTPUT_ROOT / job_id / "notes.mid"
+            try:
+                notes = parse_midi(path.read_bytes())["notes"]
+            except (OSError, ValueError):
+                notes = []
+        self._json({"clip_id": clip_id, "notes": notes})
+
+    def _project_export(self) -> None:
+        project = JOBS.project.snapshot()
+        archive = io.BytesIO()
+        included: set[tuple[str, str]] = set()
+        with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as bundle:
+            bundle.writestr("project.json", json.dumps(project, ensure_ascii=False, indent=2) + "\n")
+            for track in project.get("tracks", []):
+                for clip in track.get("clips", []):
+                    job_id = str(clip.get("job_id", ""))
+                    if not re.fullmatch(r"job-[a-f0-9]{12}", job_id):
+                        continue
+                    for filename, folder in (("audio.wav", "audio"), ("notes.mid", "midi")):
+                        key = (job_id, filename)
+                        path = OUTPUT_ROOT / job_id / filename
+                        if key in included or not path.is_file():
+                            continue
+                        bundle.writestr(f"{folder}/{job_id}.{filename.split('.')[-1]}", path.read_bytes())
+                        included.add(key)
+        self._send_bytes(archive.getvalue(), "application/zip", "muscriptor-studio-project.zip")
+
     def do_GET(self) -> None:  # noqa: N802
         path = urlparse(self.path).path
         if path == "/api/health":
@@ -224,6 +303,12 @@ class StudioHandler(SimpleHTTPRequestHandler):
             return
         if path == "/api/runtime":
             self._json({**JOBS.runtime_snapshot(), "app": "muscriptor-studio", "version": APP_VERSION, "deployment": self.deployment})
+            return
+        if path == "/api/project/export":
+            self._project_export()
+            return
+        if path.startswith("/api/project/midi/"):
+            self._midi_json(unquote(path.removeprefix("/api/project/midi/")).strip("/"))
             return
         if path == "/api/project":
             self._json(project_snapshot())
@@ -245,6 +330,15 @@ class StudioHandler(SimpleHTTPRequestHandler):
 
     def do_POST(self) -> None:  # noqa: N802
         path = urlparse(self.path).path
+        if path == "/api/project/track":
+            payload = self._read_json()
+            try:
+                track = JOBS.project.add_track(str(payload.get("type", "audio")), str(payload.get("name", "New Track")))
+            except (TypeError, ValueError) as exc:
+                self._json({"ok": False, "error": str(exc)}, status=HTTPStatus.BAD_REQUEST)
+                return
+            self._json({"track": track, "project": JOBS.project.snapshot()}, status=HTTPStatus.CREATED)
+            return
         if path in {"/api/jobs", "/api/demo/generate"}:
             try:
                 job = JOBS.submit(self._read_json())
@@ -252,6 +346,50 @@ class StudioHandler(SimpleHTTPRequestHandler):
                 self._json({"ok": False, "error": str(exc)}, status=HTTPStatus.BAD_REQUEST)
                 return
             self._json(job, status=HTTPStatus.ACCEPTED)
+            return
+        self._json({"ok": False, "error": "Not found"}, status=HTTPStatus.NOT_FOUND)
+
+    def do_PATCH(self) -> None:  # noqa: N802
+        path = urlparse(self.path).path
+        payload = self._read_json()
+        try:
+            if path.startswith("/api/project/track/"):
+                track_id = unquote(path.removeprefix("/api/project/track/")).strip("/")
+                updated = JOBS.project.update_track(track_id, payload)
+            elif path.startswith("/api/project/clip/"):
+                clip_id = unquote(path.removeprefix("/api/project/clip/")).strip("/")
+                updated = JOBS.project.update_clip(clip_id, payload)
+            elif path.startswith("/api/project/midi/"):
+                clip_id = unquote(path.removeprefix("/api/project/midi/")).strip("/")
+                notes = payload.get("notes")
+                if not isinstance(notes, list) or not all(isinstance(note, dict) for note in notes):
+                    raise ValueError("notes must be a list of objects")
+                clip = JOBS.project.get_clip(clip_id)
+                encoded = encode_midi(notes, tempo_bpm=float(JOBS.project.snapshot().get("bpm", 120)))
+                job_id = str(clip.get("job_id", ""))
+                if not re.fullmatch(r"job-[a-f0-9]{12}", job_id):
+                    raise ValueError("MIDI clip has no writable artifact")
+                (OUTPUT_ROOT / job_id).mkdir(parents=True, exist_ok=True)
+                (OUTPUT_ROOT / job_id / "notes.mid").write_bytes(encoded)
+                updated = JOBS.project.update_midi_notes(clip_id, notes)
+            else:
+                self._json({"ok": False, "error": "Not found"}, status=HTTPStatus.NOT_FOUND)
+                return
+        except (KeyError, TypeError, ValueError, OSError) as exc:
+            self._json({"ok": False, "error": str(exc)}, status=HTTPStatus.BAD_REQUEST)
+            return
+        self._json({"updated": updated, "project": JOBS.project.snapshot()})
+
+    def do_DELETE(self) -> None:  # noqa: N802
+        path = urlparse(self.path).path
+        if path.startswith("/api/project/clip/"):
+            clip_id = unquote(path.removeprefix("/api/project/clip/")).strip("/")
+            try:
+                project = JOBS.project.remove_clip(clip_id)
+            except KeyError as exc:
+                self._json({"ok": False, "error": str(exc)}, status=HTTPStatus.NOT_FOUND)
+                return
+            self._json({"project": project})
             return
         self._json({"ok": False, "error": "Not found"}, status=HTTPStatus.NOT_FOUND)
 

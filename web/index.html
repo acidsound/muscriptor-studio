@@ -27,6 +27,7 @@
       --sans: Pretendard, "Noto Sans KR", Inter, ui-sans-serif, system-ui, sans-serif;
     }
 
+    [hidden] { display: none !important; }
     * { box-sizing: border-box; }
     html, body { min-height: 100%; }
     body {
@@ -132,18 +133,25 @@
     .segment.active { background: var(--surface-3); color: var(--text); }
     .toolbar-tools { display: flex; align-items: center; gap: 8px; color: var(--muted); }
     .toolbar-label { font: 10px var(--mono); }
+    .toolbar-button { border: 0; padding: 0; background: transparent; cursor: pointer; }
+    .toolbar-button:hover { color: var(--text); }
     .zoom { width: 82px; accent-color: var(--ai); }
 
     .timeline { position: relative; overflow: auto; background-color: var(--canvas); background-image: linear-gradient(to right, rgba(255,255,255,.045) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,.035) 1px, transparent 1px); background-size: calc(100% / 16) 100%, 100% 67px; }
     .ruler { height: 33px; display: grid; grid-template-columns: repeat(16, minmax(52px, 1fr)); align-items: end; border-bottom: 1px solid var(--line); background: rgba(17, 22, 26, .88); min-width: 832px; }
     .bar-number { height: 22px; padding-left: 7px; border-left: 1px solid var(--line); color: var(--faint); font: 10px var(--mono); }
     .bar-number:nth-child(4n + 1) { color: var(--muted); }
-    .lane { position: relative; display: grid; grid-template-columns: repeat(16, minmax(52px, 1fr)); min-width: 832px; height: 67px; border-bottom: 1px solid rgba(42, 53, 59, .65); }
+    .lane { position: relative; display: block; min-width: 832px; height: 67px; border-bottom: 1px solid rgba(42, 53, 59, .65); }
     .lane-name { position: absolute; left: 8px; top: 7px; z-index: 2; color: var(--faint); font: 9px var(--mono); pointer-events: none; }
     .clip { position: relative; z-index: 1; align-self: center; height: 43px; margin: 0 3px; padding: 7px 9px; overflow: hidden; border-radius: 4px; cursor: pointer; transition: filter .15s ease, transform .15s ease; }
     .clip:hover { filter: brightness(1.13); transform: translateY(-1px); }
-    .clip.audio { grid-column: 2 / span 6; border: 1px solid rgba(228, 176, 90, .58); background: linear-gradient(180deg, rgba(228,176,90,.25), rgba(228,176,90,.11)); color: #f7d798; }
-    .clip.midi { grid-column: 3 / span 5; border: 1px solid rgba(85, 208, 192, .58); background: linear-gradient(180deg, rgba(85,208,192,.23), rgba(85,208,192,.08)); color: #9af0e5; }
+    .clip.selected { outline: 2px solid var(--text); outline-offset: 1px; }
+    .clip-handle { position: absolute; top: 0; right: 0; bottom: 0; width: 7px; cursor: ew-resize; background: rgba(255,255,255,.22); opacity: .35; }
+    .clip:hover .clip-handle, .clip.selected .clip-handle { opacity: .9; }
+    .lane-empty { position: absolute; left: 8px; top: 27px; color: var(--faint); font: 9px var(--mono); letter-spacing: .05em; }
+    .clip.audio { grid-column: var(--clip-start, 2) / span var(--clip-span, 6); border: 1px solid rgba(228, 176, 90, .58); background: linear-gradient(180deg, rgba(228,176,90,.25), rgba(228,176,90,.11)); color: #f7d798; }
+    .clip.midi { grid-column: var(--clip-start, 2) / span var(--clip-span, 5); border: 1px solid rgba(85, 208, 192, .58); background: linear-gradient(180deg, rgba(85,208,192,.23), rgba(85,208,192,.08)); color: #9af0e5; }
+    .clip { left: calc(var(--clip-left, 0) * 1%); width: calc(var(--clip-width, 10) * 1%); top: 12px; align-self: auto; }
     .clip.demo-hidden { opacity: .38; }
     .clip-label { position: relative; z-index: 2; display: flex; justify-content: space-between; gap: 5px; font-size: 11px; font-weight: 650; }
     .clip-meta { position: relative; z-index: 2; margin-top: 6px; color: inherit; opacity: .68; font: 9px var(--mono); }
@@ -164,7 +172,8 @@
     .piano-keys { display: grid; grid-template-rows: repeat(8, 1fr); border-right: 1px solid var(--line); background: var(--surface-2); }
     .key { padding: 5px 7px; border-bottom: 1px solid var(--line); color: var(--faint); font: 9px var(--mono); }
     .note-grid { position: relative; background-image: linear-gradient(to right, rgba(255,255,255,.065) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,.065) 1px, transparent 1px); background-size: calc(100% / 16) 100%, 100% 25%; }
-    .note { position: absolute; height: 14px; border: 1px solid rgba(85,208,192,.9); border-radius: 2px; background: var(--midi); box-shadow: 0 0 9px rgba(85,208,192,.16); }
+    .note { position: absolute; height: 14px; border: 1px solid rgba(85,208,192,.9); border-radius: 2px; background: var(--midi); box-shadow: 0 0 9px rgba(85,208,192,.16); cursor: grab; }
+    .note:hover, .note.selected { background: #b1fff5; box-shadow: 0 0 12px rgba(85,208,192,.55); }
     .note.n1 { left: 10%; top: 18%; width: 9%; }.note.n2 { left: 20%; top: 43%; width: 12%; }.note.n3 { left: 34%; top: 31%; width: 8%; }.note.n4 { left: 45%; top: 68%; width: 13%; }.note.n5 { left: 60%; top: 18%; width: 10%; }.note.n6 { left: 74%; top: 43%; width: 15%; }
 
     .inspector-tabs { display: grid; grid-template-columns: 1fr 1fr; border-bottom: 1px solid var(--line); }
@@ -178,6 +187,8 @@
     textarea { min-height: 94px; padding: 10px; resize: vertical; line-height: 1.45; }
     textarea::placeholder { color: var(--faint); }
     select { height: 34px; padding: 0 8px; }
+    .text-input { width: 100%; height: 34px; padding: 0 8px; color: var(--text); border: 1px solid var(--line); border-radius: 4px; background: var(--surface-2); }
+    .text-input:disabled { opacity: .45; cursor: not-allowed; }
     .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 13px 0; }
     .generate-button { width: 100%; height: 40px; margin-top: 4px; }
     .shortcut { float: right; color: rgba(28,16,13,.65); font: 9px var(--mono); }
@@ -196,6 +207,15 @@
     .artifact-links { display: none; gap: 7px; margin-top: 10px; }
     .artifact-links a { flex: 1; display: inline-flex; justify-content: center; align-items: center; min-height: 27px; border: 1px solid var(--line); border-radius: 4px; color: var(--muted); background: var(--surface-2); text-decoration: none; font: 9px var(--mono); }
     .artifact-links a:hover { color: var(--text); border-color: var(--line-strong); }
+    .danger-button { width: 100%; margin-top: 12px; color: var(--danger); border-color: rgba(255,100,107,.35); background: rgba(255,100,107,.06); }
+    .danger-button:hover { color: #fff; border-color: var(--danger); background: rgba(255,100,107,.16); }
+    .inspector-note { margin-top: 16px; color: var(--faint); font: 9px var(--mono); line-height: 1.45; }
+    .waveform-editor { height: calc(100% - 42px); min-height: 180px; padding: 14px; }
+    .waveform-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; color: var(--muted); font: 9px var(--mono); }
+    .waveform-canvas { display: flex; align-items: center; gap: 2px; height: calc(100% - 38px); margin-top: 12px; padding: 12px; border: 1px solid var(--line); border-radius: 4px; background: var(--surface-2); overflow: hidden; }
+    .wave-bar { flex: 1; min-width: 2px; border-radius: 2px; background: var(--audio); opacity: .76; }
+    .track-row.muted { opacity: .45; }
+    .track-row.solo { border-color: var(--midi); }
 
     .statusbar { justify-content: space-between; gap: 10px; padding: 0 12px; border-top: 1px solid var(--line); background: #0e1214; color: var(--faint); font: 9px var(--mono); }
     .statusbar-left, .statusbar-right { display: flex; align-items: center; gap: 12px; min-width: 0; }
@@ -238,13 +258,13 @@
       </div>
       <div class="project-title">
         <strong>Untitled Signal Study</strong>
-        <span class="autosave">● saved</span>
+        <span class="autosave" id="autosave-status">● saved</span>
       </div>
       <div class="transport" aria-label="Transport">
-        <button class="transport-button" title="Return to start">|◀</button>
-        <button class="transport-button" title="Previous bar">◀</button>
+        <button class="transport-button" id="return-start" title="Return to start">|◀</button>
+        <button class="transport-button" id="previous-bar" title="Previous bar">◀</button>
         <button class="transport-button play" id="play-button" title="Play / pause">▶</button>
-        <button class="transport-button" title="Stop">■</button>
+        <button class="transport-button" id="stop-button" title="Stop">■</button>
         <span class="timecode" id="timecode">00:00.000</span>
       </div>
       <div class="top-meta">
@@ -258,27 +278,14 @@
     <main class="studio-grid">
       <aside class="track-panel panel">
         <div class="panel-title"><span>TRACKS</span><button class="icon-button" id="add-track" title="Add track">+</button></div>
-        <div class="track-group">
-          <div class="group-label">Audio</div>
-          <button class="track-row audio active" data-track="audio-1">
-            <span class="track-icon">A</span><span class="track-name">AI Bass Loop</span><span class="track-type">AUDIO</span>
-          </button>
-          <div class="track-controls"><button class="mini-control" title="Mute">M</button><button class="mini-control" title="Solo">S</button><button class="mini-control" title="Volume">V</button></div>
-        </div>
-        <div class="track-group">
-          <div class="group-label">MIDI</div>
-          <button class="track-row midi" data-track="midi-1">
-            <span class="track-icon">M</span><span class="track-name">Bass MIDI</span><span class="track-type">MIDI</span>
-          </button>
-          <div class="track-controls"><button class="mini-control" title="Mute">M</button><button class="mini-control" title="Solo">S</button><button class="mini-control" title="Instrument">I</button></div>
-        </div>
+        <div id="track-list"></div>
         <button class="new-track" id="new-track">+ Add track</button>
       </aside>
 
       <section class="main-stage">
         <div class="toolbar">
-          <div class="segmented"><button class="segment active">Arrange</button><button class="segment">Clip</button></div>
-          <div class="toolbar-tools"><span class="toolbar-label">SNAP 1/16</span><span class="toolbar-label">ZOOM</span><input class="zoom" type="range" min="1" max="10" value="4" aria-label="Timeline zoom"></div>
+          <div class="segmented"><button class="segment active" id="arrange-mode" data-mode="arrange">Arrange</button><button class="segment" id="clip-mode" data-mode="clip">Clip</button></div>
+          <div class="toolbar-tools"><button class="toolbar-label toolbar-button" id="snap-button" title="Change snap resolution">SNAP 1/16</button><span class="toolbar-label">ZOOM</span><input class="zoom" id="zoom-control" type="range" min="1" max="10" value="4" aria-label="Timeline zoom"></div>
         </div>
         <section class="timeline" aria-label="Arrangement timeline">
           <div class="ruler">
@@ -287,49 +294,70 @@
             <div class="bar-number">09</div><div class="bar-number">10</div><div class="bar-number">11</div><div class="bar-number">12</div>
             <div class="bar-number">13</div><div class="bar-number">14</div><div class="bar-number">15</div><div class="bar-number">16</div>
           </div>
-          <div class="lane"><span class="lane-name">AUDIO 01</span><div class="clip audio" id="audio-clip"><div class="clip-label"><span>AI Bass Loop</span><span>8.0s</span></div><div class="clip-meta">Stable Audio · 120 BPM target</div><div class="waveform"></div></div></div>
-          <div class="lane"><span class="lane-name">MIDI 01</span><div class="clip midi"><div class="clip-label"><span>Bass MIDI</span><span>🔗</span></div><div class="clip-meta">derived from AI Bass Loop</div><div class="midi-notes"></div></div></div>
+          <div id="timeline-lanes"></div>
           <div class="playhead" id="playhead" aria-hidden="true"></div>
         </section>
         <section class="detail-editor">
           <div class="detail-heading">
             <div class="detail-title"><span class="eyebrow">DETAIL EDITOR</span><strong id="detail-title">AI Bass Loop</strong></div>
-            <div class="editor-tabs"><button class="editor-tab active" data-editor="piano">Piano Roll</button><button class="editor-tab" data-editor="waveform">Waveform</button></div>
+            <div class="editor-tabs"><button class="editor-tab active" id="piano-tab" data-editor="piano">Piano Roll</button><button class="editor-tab" id="waveform-tab" data-editor="waveform">Waveform</button></div>
           </div>
           <div class="piano-roll" id="piano-roll">
             <div class="piano-keys"><div class="key">C5</div><div class="key">B4</div><div class="key">A4</div><div class="key">G4</div><div class="key">F4</div><div class="key">E4</div><div class="key">D4</div><div class="key">C4</div></div>
-            <div class="note-grid"><div class="note n1"></div><div class="note n2"></div><div class="note n3"></div><div class="note n4"></div><div class="note n5"></div><div class="note n6"></div></div>
+            <div class="note-grid" id="note-grid" tabindex="0" aria-label="MIDI piano roll"></div>
+          </div>
+          <div class="waveform-editor" id="waveform-editor" hidden>
+            <div class="waveform-toolbar"><span id="waveform-status">Select an audio clip to inspect its waveform</span><button class="button ghost" id="waveform-play">Play selected</button></div>
+            <div class="waveform-canvas" id="waveform-canvas"></div>
           </div>
         </section>
       </section>
 
       <aside class="inspector panel">
-        <div class="inspector-tabs"><button class="inspector-tab active">Generate</button><button class="inspector-tab">Inspector</button></div>
+        <div class="inspector-tabs"><button class="inspector-tab active" id="generate-tab" data-pane="generate">Generate</button><button class="inspector-tab" id="inspector-tab" data-pane="inspector">Inspector</button></div>
         <div class="inspector-body">
-          <div class="eyebrow">CREATE AUDIO CLIP</div>
-          <h1>Prompt the next layer.</h1>
-          <p>Generate a sound, place it on the timeline, then extract editable MIDI from the result.</p>
-          <form id="generate-form">
-            <label class="field-label" for="prompt">DESCRIPTION</label>
-            <textarea id="prompt" placeholder="warm analog bass loop, 120 BPM, four bars">warm analog bass loop, 120 BPM, four bars</textarea>
-            <div class="field-row">
-              <label><span class="field-label">DURATION</span><select id="duration"><option value="4">4 sec</option><option value="8" selected>8 sec</option><option value="16">16 sec · experimental</option></select></label>
-              <label><span class="field-label">TARGET</span><select><option selected>4 bars</option><option>8 bars</option><option>Free length</option></select></label>
+          <section id="generate-pane" class="inspector-pane">
+            <div class="eyebrow">CREATE AUDIO CLIP</div>
+            <h1>Prompt the next layer.</h1>
+            <p>Generate a sound, place it on the timeline, then extract editable MIDI from the result.</p>
+            <form id="generate-form">
+              <label class="field-label" for="prompt">DESCRIPTION</label>
+              <textarea id="prompt" placeholder="warm analog bass loop, 120 BPM, four bars">warm analog bass loop, 120 BPM, four bars</textarea>
+              <div class="field-row">
+                <label><span class="field-label">DURATION</span><select id="duration"><option value="4">4 sec</option><option value="8" selected>8 sec</option><option value="16">16 sec · experimental</option></select></label>
+                <label><span class="field-label">TARGET</span><select id="target"><option value="4" selected>4 bars</option><option value="8">8 bars</option><option value="free">Free length</option></select></label>
+              </div>
+              <button class="button primary generate-button" type="submit" id="generate-button">Generate Audio <span class="shortcut">⌘ ↵</span></button>
+            </form>
+            <div class="queue-card">
+              <div class="queue-line"><strong id="queue-status">Ready to generate</strong><span id="queue-time">—</span></div>
+              <div class="progress-track"><div class="progress-value" id="progress-value"></div></div>
+              <div class="queue-note" id="queue-note">The first job loads both models on the T4, then generates WAV and extracts MIDI.</div>
             </div>
-            <button class="button primary generate-button" type="submit" id="generate-button">Generate Audio <span class="shortcut">⌘ ↵</span></button>
-          </form>
-          <div class="queue-card">
-            <div class="queue-line"><strong id="queue-status">Ready to generate</strong><span id="queue-time">—</span></div>
-            <div class="progress-track"><div class="progress-value" id="progress-value"></div></div>
-            <div class="queue-note" id="queue-note">The first job loads both models on the T4, then generates WAV and extracts MIDI.</div>
-          </div>
-          <div class="selected-card">
-            <div class="eyebrow">SELECTED CLIP</div>
-            <div class="card-title"><span>AI Bass Loop</span><span class="deployment-chip">AUDIO</span></div>
-            <div class="card-details"><div><span>MODEL</span><strong>Stable Audio Open</strong></div><div><span>STATUS</span><strong id="clip-status">Ready</strong></div><div><span>LINK</span><strong>Audio ↔ MIDI</strong></div><div><span>LENGTH</span><strong id="clip-length">8.0 seconds</strong></div></div>
-            <audio class="preview-audio" id="preview-audio" controls preload="metadata"></audio>
-            <div class="artifact-links" id="artifact-links"><a id="audio-download" href="#" download="audio.wav">WAV</a><a id="midi-download" href="#" download="notes.mid">MIDI</a></div>
-          </div>
+            <div class="selected-card">
+              <div class="eyebrow">SELECTED CLIP</div>
+              <div class="card-title"><span id="selected-name">No clip selected</span><span class="deployment-chip" id="selected-type">AUDIO</span></div>
+              <div class="card-details"><div><span>MODEL</span><strong id="selected-model">—</strong></div><div><span>STATUS</span><strong id="clip-status">Idle</strong></div><div><span>LINK</span><strong id="selected-link">—</strong></div><div><span>LENGTH</span><strong id="clip-length">—</strong></div></div>
+              <audio class="preview-audio" id="preview-audio" controls preload="metadata"></audio>
+              <div class="artifact-links" id="artifact-links"><a id="audio-download" href="#" download="audio.wav">WAV</a><a id="midi-download" href="#" download="notes.mid">MIDI</a></div>
+            </div>
+          </section>
+          <section id="inspector-pane" class="inspector-pane" hidden>
+            <div class="eyebrow">CLIP INSPECTOR</div>
+            <h1 id="inspector-heading">Nothing selected.</h1>
+            <p id="inspector-help">Select a timeline clip to edit its arrangement properties.</p>
+            <form id="clip-form">
+              <label class="field-label" for="clip-name">NAME</label>
+              <input class="text-input" id="clip-name" type="text" maxlength="80" disabled>
+              <div class="field-row">
+                <label><span class="field-label">START BEAT</span><input class="text-input" id="clip-start" type="number" min="0" step="0.25" disabled></label>
+                <label><span class="field-label">LENGTH BEATS</span><input class="text-input" id="clip-length-input" type="number" min="0.25" step="0.25" disabled></label>
+              </div>
+              <button class="button primary" id="save-clip" type="submit" disabled>Save clip</button>
+            </form>
+            <button class="button danger-button" id="delete-clip" type="button" disabled>Delete linked clip pair</button>
+            <div class="inspector-note" id="inspector-note">Audio and MIDI clips from one job move together.</div>
+          </section>
         </div>
       </aside>
     </main>
@@ -342,174 +370,726 @@
   <div class="toast" id="toast" role="status"></div>
 
   <script>
-    const $ = (selector) => document.querySelector(selector);
-    const toast = $('#toast');
-    let toastTimer;
-    let playing = false;
-    let playStart = 0;
-    let playElapsed = 0;
-    let frame;
+    (() => {
+      const $ = (selector) => document.querySelector(selector);
+      const toast = $('#toast');
+      const state = {
+        project: null,
+        selectedClipId: null,
+        selectedTrackId: null,
+        selectedNoteIndex: null,
+        editor: 'piano',
+        mode: 'arrange',
+        snapBeats: 0.25,
+        zoom: 4,
+        playing: false,
+        drag: null,
+        noteDrag: null,
+      };
+      let toastTimer;
+      let noteRequest = 0;
 
-    function showToast(message) {
-      toast.textContent = message;
-      toast.classList.add('show');
-      clearTimeout(toastTimer);
-      toastTimer = setTimeout(() => toast.classList.remove('show'), 2600);
-    }
+      const labels = {
+        queued: 'Queued', loading_models: 'Loading models', generating: 'Generating audio',
+        transcribing: 'Extracting MIDI', ready: 'Ready', failed: 'Failed'
+      };
 
-    function updateClock(seconds) {
-      const mins = Math.floor(seconds / 60).toString().padStart(2, '0');
-      const secs = (seconds % 60).toFixed(3).padStart(6, '0');
-      $('#timecode').textContent = `${mins}:${secs}`;
-    }
+      function showToast(message) {
+        toast.textContent = message;
+        toast.classList.add('show');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => toast.classList.remove('show'), 2600);
+      }
 
-    function animatePlay(now) {
-      if (!playing) return;
-      if (!playStart) playStart = now - playElapsed * 1000;
-      playElapsed = ((now - playStart) / 1000) % 32;
-      updateClock(playElapsed);
-      $('#playhead').style.left = `${12 + (playElapsed / 32) * 76}%`;
-      frame = requestAnimationFrame(animatePlay);
-    }
+      function escapeHtml(value) {
+        return String(value ?? '').replace(/[&<>"']/g, (character) => ({
+          '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        }[character]));
+      }
 
-    $('#play-button').addEventListener('click', () => {
-      playing = !playing;
-      $('#play-button').textContent = playing ? '❚❚' : '▶';
-      if (playing) { playStart = 0; frame = requestAnimationFrame(animatePlay); }
-      else cancelAnimationFrame(frame);
-    });
+      function markSaved(status = 'saved') {
+        const element = $('#autosave-status');
+        if (!element) return;
+        element.textContent = status === 'saving' ? '● saving…' : '● saved';
+        element.style.color = status === 'saving' ? 'var(--audio)' : 'var(--success)';
+      }
 
-    document.querySelectorAll('.track-row').forEach((row) => row.addEventListener('click', () => {
-      document.querySelectorAll('.track-row').forEach((item) => item.classList.remove('active'));
-      row.classList.add('active');
-      const isMidi = row.dataset.track === 'midi-1';
-      $('#detail-title').textContent = isMidi ? 'Bass MIDI' : 'AI Bass Loop';
-      showToast(`${isMidi ? 'MIDI' : 'Audio'} track selected`);
-    }));
+      async function api(path, options = {}) {
+        const response = await fetch(path, {cache: 'no-store', ...options});
+        const contentType = response.headers.get('content-type') || '';
+        const payload = contentType.includes('application/json') ? await response.json() : await response.blob();
+        if (!response.ok) throw new Error(payload?.error || `Request failed (${response.status})`);
+        return payload;
+      }
 
-    document.querySelectorAll('.editor-tab').forEach((tab) => tab.addEventListener('click', () => {
-      document.querySelectorAll('.editor-tab').forEach((item) => item.classList.remove('active'));
-      tab.classList.add('active');
-      showToast(`${tab.textContent} editor selected`);
-    }));
+      function allClips() {
+        return (state.project?.tracks || []).flatMap((track) => (track.clips || []).map((clip) => ({clip, track})));
+      }
 
-    $('#add-track').addEventListener('click', () => showToast('Track creation is next in the Studio slice.'));
-    $('#new-track').addEventListener('click', () => showToast('Track creation is next in the Studio slice.'));
-    $('#export-button').addEventListener('click', () => {
-      const link = $('#audio-download');
-      if (link.href && !link.href.endsWith('#')) link.click();
-      else showToast('Generate an audio clip first.');
-    });
+      function findClip(clipId) {
+        return allClips().find(({clip}) => clip.id === clipId) || null;
+      }
 
-    async function watchJob(jobId) {
-      const status = $('#queue-status');
-      const note = $('#queue-note');
-      const progress = $('#progress-value');
-      const clipStatus = $('#clip-status');
-      while (true) {
-        const response = await fetch(`/api/jobs/${jobId}`, {cache: 'no-store'});
-        const job = await response.json();
-        if (!response.ok) throw new Error(job.error || 'Unable to read job status');
-        const labels = {
-          queued: 'Queued',
-          loading_models: 'Loading models',
-          generating: 'Generating audio',
-          transcribing: 'Extracting MIDI',
-          ready: 'Ready',
-          failed: 'Failed'
-        };
-        status.textContent = labels[job.status] || job.status;
-        progress.style.width = `${job.progress || 0}%`;
-        note.textContent = job.message || '';
-        clipStatus.textContent = labels[job.status] || job.status;
-        $('#queue-time').textContent = job.status === 'ready' ? `${job.result.generation_seconds}s` : job.job_id.slice(-6);
-        if (job.status === 'ready') {
-          const result = job.result;
-          $('#preview-audio').src = result.audio_url;
-          $('#preview-audio').style.display = 'block';
-          $('#audio-download').href = result.audio_url;
-          $('#midi-download').href = result.midi_url;
-          $('#artifact-links').style.display = 'flex';
-          $('#clip-length').textContent = `${result.duration_seconds}s`;
-          note.textContent = `WAV ${result.audio_bytes} bytes · MIDI ${result.midi_bytes} bytes · ${result.device}`;
-          showToast('Audio generated and MIDI extracted.');
-          return job;
+      function findTrack(trackId) {
+        return (state.project?.tracks || []).find((track) => track.id === trackId) || null;
+      }
+
+      function currentSelection() {
+        return state.selectedClipId ? findClip(state.selectedClipId) : null;
+      }
+
+      function totalBeats() {
+        return Math.max(16, Number(state.project?.length_bars || 16) * 4);
+      }
+
+      function quantize(value) {
+        if (!state.snapBeats) return Math.max(0, value);
+        return Math.max(0, Math.round(value / state.snapBeats) * state.snapBeats);
+      }
+
+      function clipStyle(clip) {
+        const total = totalBeats();
+        const left = Math.max(0, Math.min(100, Number(clip.start_beat || 0) / total * 100));
+        const width = Math.max(1, Math.min(100 - left, Number(clip.length_beats || 1) / total * 100));
+        return `--clip-left:${left};--clip-width:${width};`;
+      }
+
+      function applyProject(nextProject, keepSelection = true) {
+        state.project = nextProject;
+        if (keepSelection && state.selectedClipId && !findClip(state.selectedClipId)) state.selectedClipId = null;
+        if (state.selectedTrackId && !findTrack(state.selectedTrackId)) state.selectedTrackId = null;
+        renderTrackPanel();
+        renderTimeline();
+        renderSelectionPanel();
+        renderInspectorForm();
+        renderEditor();
+        applyZoom(state.zoom);
+      }
+
+      function renderTrackPanel() {
+        const groups = ['audio', 'midi'].map((type) => {
+          const tracks = (state.project?.tracks || []).filter((track) => track.type === type);
+          if (!tracks.length) return '';
+          return `<div class="track-group"><div class="group-label">${type.toUpperCase()}</div>${tracks.map((track) => `
+            <div class="track-item">
+              <button class="track-row ${type}${track.mute ? ' muted' : ''}${track.solo ? ' solo' : ''}${state.selectedTrackId === track.id ? ' active' : ''}" data-track="${escapeHtml(track.id)}">
+                <span class="track-icon">${type === 'audio' ? 'A' : 'M'}</span><span class="track-name">${escapeHtml(track.name)}</span><span class="track-type">${type.toUpperCase()}</span>
+              </button>
+              <div class="track-controls">
+                <button class="mini-control${track.mute ? ' muted' : ''}" data-track-action="mute" data-track-id="${escapeHtml(track.id)}" title="Mute">M</button>
+                <button class="mini-control${track.solo ? ' muted' : ''}" data-track-action="solo" data-track-id="${escapeHtml(track.id)}" title="Solo">S</button>
+                <button class="mini-control" data-track-action="${type === 'audio' ? 'volume' : 'instrument'}" data-track-id="${escapeHtml(track.id)}" title="${type === 'audio' ? `Volume ${(Number(track.volume ?? 1) * 100).toFixed(0)}%` : escapeHtml(track.instrument || 'Instrument')}">${type === 'audio' ? 'V' : 'I'}</button>
+              </div>
+            </div>`).join('')}</div>`;
+        }).join('');
+        $('#track-list').innerHTML = groups || '<div class="lane-empty">No tracks</div>';
+        document.querySelectorAll('[data-track]').forEach((row) => row.addEventListener('click', () => {
+          const track = findTrack(row.dataset.track);
+          if (!track) return;
+          state.selectedTrackId = track.id;
+          const clip = track.clips?.[track.clips.length - 1];
+          if (clip) state.selectedClipId = clip.id;
+          applyProject(state.project);
+          if (!clip) showToast(`${track.name} is ready for a generated clip`);
+        }));
+        document.querySelectorAll('[data-track-action]').forEach((control) => control.addEventListener('click', async (event) => {
+          event.stopPropagation();
+          await handleTrackControl(control.dataset.trackId, control.dataset.trackAction);
+        }));
+      }
+
+      async function handleTrackControl(trackId, action) {
+        const track = findTrack(trackId);
+        if (!track) return;
+        let changes;
+        if (action === 'mute' || action === 'solo') {
+          changes = {[action]: !track[action]};
+        } else if (action === 'volume') {
+          const values = [1, 0.75, 0.5, 0.25, 0];
+          const index = values.findIndex((value) => Math.abs(value - Number(track.volume ?? 1)) < 0.01);
+          changes = {volume: values[(index + 1) % values.length]};
+        } else {
+          const instruments = ['Acoustic Grand Piano', 'Synth Bass', 'Electric Piano', 'Pluck Lead'];
+          const index = instruments.indexOf(track.instrument);
+          changes = {instrument: instruments[(index + 1) % instruments.length]};
         }
-        if (job.status === 'failed') throw new Error(job.error || 'Inference failed');
-        await new Promise((resolve) => setTimeout(resolve, 900));
+        try {
+          markSaved('saving');
+          const result = await api(`/api/project/track/${encodeURIComponent(trackId)}`, {method: 'PATCH', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(changes)});
+          applyProject(result.project);
+          markSaved();
+          showToast(`${track.name}: ${action} updated`);
+        } catch (error) {
+          markSaved();
+          showToast(error.message);
+        }
       }
-    }
 
-    $('#generate-form').addEventListener('submit', async (event) => {
-      event.preventDefault();
-      const button = $('#generate-button');
-      const status = $('#queue-status');
-      const note = $('#queue-note');
-      const progress = $('#progress-value');
-      const clipStatus = $('#clip-status');
-      const audio = $('#preview-audio');
-      button.disabled = true;
-      button.textContent = 'Queued…';
-      status.textContent = 'Queued';
-      clipStatus.textContent = 'Queued';
-      note.textContent = 'Submitting one job to the T4 worker…';
-      progress.style.width = '2%';
-      audio.pause();
-      audio.removeAttribute('src');
-      audio.load();
-      $('#artifact-links').style.display = 'none';
-      try {
-        const response = await fetch('/api/jobs', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({
-            prompt: $('#prompt').value,
-            duration_seconds: Number($('#duration').value),
-            steps: 20
-          })
+      function renderTimeline() {
+        const lanes = (state.project?.tracks || []).map((track, index) => {
+          const clips = track.clips || [];
+          const clipHtml = clips.length ? clips.map((clip) => `
+            <div class="clip ${escapeHtml(track.type)}${state.selectedClipId === clip.id ? ' selected' : ''}" data-clip="${escapeHtml(clip.id)}" style="${clipStyle(clip)}" title="${escapeHtml(clip.name)} · ${Number(clip.start_beat || 0).toFixed(2)} beats">
+              <div class="clip-label"><span>${escapeHtml(clip.name)}</span><span>${track.type === 'midi' ? '🔗' : `${escapeHtml(clip.duration_seconds)}s`}</span></div>
+              <div class="clip-meta">${track.type === 'midi' ? 'linked MIDI · MuScriptor' : 'Stable Audio · generated'}</div>
+              <div class="${track.type === 'midi' ? 'midi-notes' : 'waveform'}"></div><span class="clip-handle" data-resize="${escapeHtml(clip.id)}" aria-label="Resize clip"></span>
+            </div>`).join('') : '<span class="lane-empty">No clips yet — generate from the inspector</span>';
+          return `<div class="lane" data-track-lane="${escapeHtml(track.id)}"><span class="lane-name">${track.type.toUpperCase()} ${String(index + 1).padStart(2, '0')}</span>${clipHtml}</div>`;
+        }).join('');
+        $('#timeline-lanes').innerHTML = lanes;
+        document.querySelectorAll('[data-clip]').forEach((element) => {
+          element.addEventListener('click', (event) => {
+            if (state.drag?.moved || event.target.closest('[data-resize]')) return;
+            const found = findClip(element.dataset.clip);
+            if (found) selectClip(found.clip, found.track);
+          });
+          element.addEventListener('pointerdown', (event) => beginClipDrag(event, element.dataset.clip, element, false));
         });
-        const job = await response.json();
-        if (!response.ok) throw new Error(job.error || 'Unable to create job');
-        await watchJob(job.job_id);
-      } catch (error) {
-        status.textContent = 'Failed';
-        clipStatus.textContent = 'Failed';
-        note.textContent = error.message;
-        progress.style.width = '0%';
-        showToast(`Generation failed: ${error.message}`);
-      } finally {
-        button.disabled = false;
-        button.innerHTML = 'Generate Audio <span class="shortcut">⌘ ↵</span>';
+        document.querySelectorAll('[data-resize]').forEach((handle) => handle.addEventListener('pointerdown', (event) => {
+          event.stopPropagation();
+          beginClipDrag(event, handle.dataset.resize, handle.closest('[data-clip]'), true);
+        }));
       }
-    });
 
-    async function loadRuntime() {
-      try {
-        const [healthResponse, runtimeResponse] = await Promise.all([fetch('/api/health'), fetch('/api/runtime')]);
-        const health = await healthResponse.json();
-        const runtime = await runtimeResponse.json();
-        const isColab = runtime.deployment === 'colab-t4';
-        const label = isColab ? 'COLAB T4 · HTTPS' : `LOCAL · ${runtime.device.toUpperCase()}`;
-        $('#runtime-pill').textContent = label;
-        $('#runtime-pill').classList.add('ready');
-        if (isColab) $('#runtime-pill').classList.add('remote');
-        $('#health-dot').classList.add('ok');
-        $('#health-text').textContent = health.ok ? 'Studio server ready' : 'Studio server warning';
-        $('#runtime-text').textContent = `${runtime.device_name} · ${runtime.deployment}`;
-      } catch (error) {
-        $('#runtime-pill').textContent = 'SERVER OFFLINE';
-        $('#health-dot').classList.add('warn');
-        $('#health-text').textContent = 'Server unavailable';
-        $('#runtime-text').textContent = 'Check local or Colab deployment';
+      function beginClipDrag(event, clipId, element, resize) {
+        const found = findClip(clipId);
+        if (!found || event.button !== 0) return;
+        state.selectedClipId = found.clip.id;
+        state.selectedTrackId = found.track.id;
+        state.drag = {clipId, element, resize, startX: event.clientX, initialBeat: Number(found.clip.start_beat || 0), initialLength: Number(found.clip.length_beats || 1), moved: false};
+        window.addEventListener('pointermove', moveClipDrag);
+        window.addEventListener('pointerup', endClipDrag, {once: true});
       }
-    }
 
-    window.addEventListener('keydown', (event) => {
-      if (event.code === 'Space' && event.target.tagName !== 'TEXTAREA') { event.preventDefault(); $('#play-button').click(); }
-      if ((event.key === 'g' || event.key === 'G') && event.target.tagName !== 'TEXTAREA') { $('#prompt').focus(); }
-    });
+      function moveClipDrag(event) {
+        const drag = state.drag;
+        if (!drag) return;
+        const ruler = $('.ruler');
+        const delta = (event.clientX - drag.startX) / Math.max(1, ruler.scrollWidth) * totalBeats();
+        if (Math.abs(event.clientX - drag.startX) > 3) drag.moved = true;
+        if (drag.resize) {
+          const length = Math.max(0.25, quantize(drag.initialLength + delta));
+          drag.element.style.setProperty('--clip-width', Math.min(100, length / totalBeats() * 100));
+        } else {
+          const start = Math.max(0, quantize(drag.initialBeat + delta));
+          drag.element.style.setProperty('--clip-left', start / totalBeats() * 100);
+        }
+      }
 
-    loadRuntime();
+      async function endClipDrag(event) {
+        const drag = state.drag;
+        state.drag = null;
+        window.removeEventListener('pointermove', moveClipDrag);
+        if (!drag || !drag.moved) return;
+        const ruler = $('.ruler');
+        const delta = (event.clientX - drag.startX) / Math.max(1, ruler.scrollWidth) * totalBeats();
+        const changes = drag.resize
+          ? {length_beats: Math.max(0.25, quantize(drag.initialLength + delta))}
+          : {start_beat: Math.max(0, quantize(drag.initialBeat + delta))};
+        try {
+          markSaved('saving');
+          const result = await api(`/api/project/clip/${encodeURIComponent(drag.clipId)}`, {method: 'PATCH', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(changes)});
+          applyProject(result.project);
+          markSaved();
+          showToast(drag.resize ? 'Linked clip length saved' : 'Linked clip position saved');
+        } catch (error) {
+          markSaved();
+          showToast(error.message);
+          renderTimeline();
+        }
+      }
+
+      function setArtifactLinks(clip) {
+        const audioClip = clip?.kind === 'audio' ? clip : (clip?.linked_clip_id ? findClip(clip.linked_clip_id)?.clip : null);
+        const midiClip = clip?.kind === 'midi' ? clip : (clip?.linked_clip_id ? findClip(clip.linked_clip_id)?.clip : null);
+        const audioLink = $('#audio-download');
+        const midiLink = $('#midi-download');
+        const hasArtifact = Boolean(audioClip?.url || midiClip?.url);
+        audioLink.href = audioClip?.url || '#';
+        midiLink.href = midiClip?.url || '#';
+        $('#artifact-links').style.display = hasArtifact ? 'flex' : 'none';
+        const preview = $('#preview-audio');
+        if (audioClip?.url) {
+          const absolute = new URL(audioClip.url, window.location.href).href;
+          if (preview.src !== absolute) {
+            preview.pause();
+            preview.src = audioClip.url;
+            preview.load();
+          }
+          preview.style.display = 'block';
+        } else {
+          preview.pause();
+          preview.removeAttribute('src');
+          preview.load();
+          preview.style.display = 'none';
+        }
+      }
+
+      function renderSelectionPanel() {
+        const found = currentSelection();
+        if (!found) {
+          $('#detail-title').textContent = 'No clip selected';
+          $('#selected-name').textContent = 'No clip selected';
+          $('#selected-type').textContent = 'AUDIO';
+          $('#selected-model').textContent = '—';
+          $('#clip-status').textContent = 'Idle';
+          $('#selected-link').textContent = '—';
+          $('#clip-length').textContent = '—';
+          setArtifactLinks(null);
+          return;
+        }
+        const {clip, track} = found;
+        $('#detail-title').textContent = clip.name;
+        $('#selected-name').textContent = clip.name;
+        $('#selected-type').textContent = track.type.toUpperCase();
+        $('#selected-model').textContent = track.type === 'midi' ? 'MuScriptor' : 'Stable Audio Open';
+        $('#clip-status').textContent = clip.status || 'Ready';
+        $('#selected-link').textContent = clip.linked_clip_id ? 'Audio ↔ MIDI' : '—';
+        $('#clip-length').textContent = `${clip.duration_seconds || 0}s`;
+        setArtifactLinks(clip);
+      }
+
+      function renderInspectorForm() {
+        const found = currentSelection();
+        const controls = [$('#clip-name'), $('#clip-start'), $('#clip-length-input'), $('#save-clip'), $('#delete-clip')];
+        controls.forEach((control) => { if (control) control.disabled = !found; });
+        if (!found) {
+          $('#inspector-heading').textContent = 'Nothing selected.';
+          $('#inspector-help').textContent = 'Select a timeline clip to edit its arrangement properties.';
+          $('#clip-name').value = '';
+          $('#clip-start').value = '';
+          $('#clip-length-input').value = '';
+          return;
+        }
+        const {clip} = found;
+        $('#inspector-heading').textContent = clip.name;
+        $('#inspector-help').textContent = `${clip.kind.toUpperCase()} · ${clip.job_id || 'manual clip'} · linked edits stay synchronized.`;
+        $('#clip-name').value = clip.name;
+        $('#clip-start').value = Number(clip.start_beat || 0);
+        $('#clip-length-input').value = Number(clip.length_beats || 1);
+      }
+
+      async function loadMidiNotes(clip) {
+        const token = ++noteRequest;
+        try {
+          const result = await api(`/api/project/midi/${encodeURIComponent(clip.id)}`);
+          const found = findClip(clip.id);
+          if (found && token === noteRequest) {
+            found.clip.notes = result.notes || [];
+            renderNotes(found.clip);
+          }
+        } catch (error) {
+          if (token === noteRequest) showToast(error.message);
+        }
+      }
+
+      function renderNotes(clip) {
+        const grid = $('#note-grid');
+        if (!clip || clip.kind !== 'midi') {
+          grid.innerHTML = '<div class="lane-empty">Select a MIDI clip to edit notes</div>';
+          grid.onclick = null;
+          return;
+        }
+        if (!Array.isArray(clip.notes)) {
+          grid.innerHTML = '<div class="lane-empty">Loading MIDI notes…</div>';
+          loadMidiNotes(clip);
+          return;
+        }
+        const notes = clip.notes;
+        const total = Math.max(4, Number(clip.length_beats || 4));
+        const minPitch = 36;
+        const maxPitch = 84;
+        grid.innerHTML = notes.length ? notes.map((note, index) => {
+          const left = Math.max(0, Math.min(100, Number(note.start_beat || 0) / total * 100));
+          const width = Math.max(1.5, Math.min(100 - left, Number(note.duration_beats || .25) / total * 100));
+          const top = Math.max(0, Math.min(98, (maxPitch - Number(note.pitch || 60)) / (maxPitch - minPitch) * 100));
+          return `<button class="note${state.selectedNoteIndex === index ? ' selected' : ''}" data-note-index="${index}" style="left:${left}%;width:${width}%;top:${top}%" title="Pitch ${note.pitch} · beat ${Number(note.start_beat || 0).toFixed(2)}" aria-label="MIDI note ${note.pitch}"></button>`;
+        }).join('') : '<div class="lane-empty">No notes — click the grid to add one</div>';
+        grid.onclick = (event) => {
+          const noteElement = event.target.closest('[data-note-index]');
+          if (noteElement) {
+            state.selectedNoteIndex = Number(noteElement.dataset.noteIndex);
+            renderNotes(clip);
+            return;
+          }
+          if (event.target !== grid) return;
+          const rect = grid.getBoundingClientRect();
+          const start = quantize(Math.max(0, Math.min(total, (event.clientX - rect.left) / rect.width * total)));
+          const pitch = Math.max(minPitch, Math.min(maxPitch, maxPitch - Math.round((event.clientY - rect.top) / rect.height * (maxPitch - minPitch))));
+          state.selectedNoteIndex = notes.length;
+          persistMidiNotes(clip, [...notes, {pitch, velocity: 90, start_beat: start, duration_beats: state.snapBeats || .25, channel: 0}]);
+        };
+        grid.onkeydown = (event) => {
+          if ((event.key === 'Delete' || event.key === 'Backspace') && state.selectedNoteIndex !== null) {
+            event.preventDefault();
+            const next = notes.filter((_, index) => index !== state.selectedNoteIndex);
+            state.selectedNoteIndex = null;
+            persistMidiNotes(clip, next);
+          }
+        };
+        grid.querySelectorAll('[data-note-index]').forEach((noteElement) => {
+          noteElement.addEventListener('dblclick', (event) => {
+            event.stopPropagation();
+            const index = Number(noteElement.dataset.noteIndex);
+            state.selectedNoteIndex = null;
+            persistMidiNotes(clip, notes.filter((_, itemIndex) => itemIndex !== index));
+          });
+          noteElement.addEventListener('pointerdown', (event) => beginNoteDrag(event, clip, Number(noteElement.dataset.noteIndex), grid));
+        });
+      }
+
+      function beginNoteDrag(event, clip, index, grid) {
+        if (event.button !== 0) return;
+        event.preventDefault();
+        state.selectedNoteIndex = index;
+        state.noteDrag = {clip, index, grid, startX: event.clientX, startY: event.clientY, moved: false};
+        window.addEventListener('pointermove', moveNoteDrag);
+        window.addEventListener('pointerup', endNoteDrag, {once: true});
+      }
+
+      function moveNoteDrag(event) {
+        if (!state.noteDrag) return;
+        if (Math.abs(event.clientX - state.noteDrag.startX) > 3 || Math.abs(event.clientY - state.noteDrag.startY) > 3) state.noteDrag.moved = true;
+      }
+
+      async function endNoteDrag(event) {
+        const drag = state.noteDrag;
+        state.noteDrag = null;
+        window.removeEventListener('pointermove', moveNoteDrag);
+        if (!drag || !drag.moved) {
+          renderNotes(drag?.clip);
+          return;
+        }
+        const notes = Array.isArray(drag.clip.notes) ? drag.clip.notes.map((note) => ({...note})) : [];
+        const note = notes[drag.index];
+        if (!note) return;
+        const rect = drag.grid.getBoundingClientRect();
+        const total = Math.max(4, Number(drag.clip.length_beats || 4));
+        note.start_beat = quantize(Math.max(0, Math.min(total - Number(note.duration_beats || .25), Number(note.start_beat || 0) + (event.clientX - drag.startX) / rect.width * total)));
+        note.pitch = Math.max(36, Math.min(84, Number(note.pitch || 60) - Math.round((event.clientY - drag.startY) / rect.height * 48)));
+        await persistMidiNotes(drag.clip, notes);
+      }
+
+      async function persistMidiNotes(clip, notes) {
+        try {
+          markSaved('saving');
+          const result = await api(`/api/project/midi/${encodeURIComponent(clip.id)}`, {method: 'PATCH', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({notes})});
+          state.selectedNoteIndex = Math.min(state.selectedNoteIndex ?? 0, Math.max(0, notes.length - 1));
+          applyProject(result.project);
+          markSaved();
+          showToast('MIDI notes saved');
+        } catch (error) {
+          markSaved();
+          showToast(error.message);
+        }
+      }
+
+      function renderWaveform() {
+        const canvas = $('#waveform-canvas');
+        const status = $('#waveform-status');
+        const found = currentSelection();
+        const audio = found?.clip.kind === 'audio' ? found.clip : (found?.clip.linked_clip_id ? findClip(found.clip.linked_clip_id)?.clip : null);
+        if (!audio?.url) {
+          status.textContent = 'Select an audio clip to inspect its waveform';
+          canvas.innerHTML = '<div class="lane-empty">No audio artifact selected</div>';
+          return;
+        }
+        status.textContent = `${audio.name} · ${audio.duration_seconds}s · use the audio control in Generate to audition`;
+        const seed = [...String(audio.id)].reduce((sum, char) => sum + char.charCodeAt(0), 0);
+        canvas.innerHTML = Array.from({length: 72}, (_, index) => {
+          const height = 18 + ((seed * (index + 5) * 17) % 66);
+          return `<span class="wave-bar" style="height:${height}%"></span>`;
+        }).join('');
+      }
+
+      function renderEditor() {
+        const piano = $('#piano-roll');
+        const waveform = $('#waveform-editor');
+        const pianoTab = $('#piano-tab');
+        const waveformTab = $('#waveform-tab');
+        piano.hidden = state.editor !== 'piano';
+        waveform.hidden = state.editor !== 'waveform';
+        pianoTab.classList.toggle('active', state.editor === 'piano');
+        waveformTab.classList.toggle('active', state.editor === 'waveform');
+        if (state.editor === 'piano') renderNotes(currentSelection()?.clip || null);
+        else renderWaveform();
+      }
+
+      function selectClip(clip, track) {
+        state.selectedClipId = clip.id;
+        state.selectedTrackId = track.id;
+        applyProject(state.project);
+      }
+
+      async function loadProject(selectJobId = null) {
+        const next = await api('/api/project');
+        state.project = next;
+        state.selectedClipId = null;
+        state.selectedTrackId = null;
+        if (selectJobId) {
+          const found = allClips().find(({clip}) => clip.job_id === selectJobId && clip.kind === 'audio');
+          if (found) {
+            state.selectedClipId = found.clip.id;
+            state.selectedTrackId = found.track.id;
+          }
+        }
+        applyProject(next, true);
+        return next;
+      }
+
+      function applyZoom(value) {
+        state.zoom = Number(value) || 4;
+        const width = Math.max(832, state.zoom * 208);
+        document.querySelectorAll('.ruler, .lane').forEach((element) => { element.style.minWidth = `${width}px`; });
+        $('.timeline').style.backgroundSize = `${width / 16}px 100%, 100% 67px`;
+      }
+
+      function updateClock(seconds) {
+        const safe = Math.max(0, Number(seconds) || 0);
+        const mins = Math.floor(safe / 60).toString().padStart(2, '0');
+        const secs = (safe % 60).toFixed(3).padStart(6, '0');
+        $('#timecode').textContent = `${mins}:${secs}`;
+      }
+
+      function selectedAudio() {
+        const found = currentSelection();
+        if (found?.clip.kind === 'audio') return found.clip;
+        return found?.clip.linked_clip_id ? findClip(found.clip.linked_clip_id)?.clip : null;
+      }
+
+      function syncTransport() {
+        const audio = selectedAudio();
+        const preview = $('#preview-audio');
+        const bpm = Number(state.project?.bpm || 120);
+        const beat = Number(audio?.start_beat || 0) + Number(preview.currentTime || 0) * bpm / 60;
+        const percent = Math.max(0, Math.min(100, beat / totalBeats() * 100));
+        $('#playhead').style.left = `${percent}%`;
+        updateClock(Number(audio?.start_beat || 0) * 60 / bpm + Number(preview.currentTime || 0));
+      }
+
+      async function togglePlayback() {
+        const audio = selectedAudio();
+        const preview = $('#preview-audio');
+        if (!audio?.url || !preview.src) {
+          showToast('Select a generated audio clip first');
+          return;
+        }
+        try {
+          if (state.playing) {
+            preview.pause();
+            state.playing = false;
+          } else {
+            await preview.play();
+            state.playing = true;
+          }
+          $('#play-button').textContent = state.playing ? '❚❚' : '▶';
+        } catch (error) {
+          showToast(`Playback unavailable: ${error.message}`);
+        }
+      }
+
+      function stopPlayback(reset = true) {
+        const preview = $('#preview-audio');
+        preview.pause();
+        if (reset) preview.currentTime = 0;
+        state.playing = false;
+        $('#play-button').textContent = '▶';
+        syncTransport();
+      }
+
+      async function exportProject() {
+        try {
+          const response = await fetch('/api/project/export', {cache: 'no-store'});
+          if (!response.ok) throw new Error(`Export failed (${response.status})`);
+          const blob = await response.blob();
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = 'muscriptor-studio-project.zip';
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+          setTimeout(() => URL.revokeObjectURL(url), 1000);
+          showToast(`Project export ready · ${(blob.size / 1024).toFixed(1)} KB`);
+        } catch (error) {
+          showToast(error.message);
+        }
+      }
+
+      async function createTrack(type) {
+        const count = (state.project?.tracks || []).filter((track) => track.type === type).length + 1;
+        try {
+          markSaved('saving');
+          const result = await api('/api/project/track', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({type, name: `${type === 'audio' ? 'Audio' : 'MIDI'} Track ${String(count).padStart(2, '0')}`})});
+          state.selectedTrackId = result.track.id;
+          applyProject(result.project);
+          markSaved();
+          showToast(`${result.track.name} added`);
+        } catch (error) {
+          markSaved();
+          showToast(error.message);
+        }
+      }
+
+      async function saveClipForm(event) {
+        event.preventDefault();
+        const found = currentSelection();
+        if (!found) return;
+        try {
+          markSaved('saving');
+          const result = await api(`/api/project/clip/${encodeURIComponent(found.clip.id)}`, {method: 'PATCH', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({name: $('#clip-name').value, start_beat: Number($('#clip-start').value), length_beats: Number($('#clip-length-input').value)})});
+          applyProject(result.project);
+          markSaved();
+          showToast('Clip arrangement saved');
+        } catch (error) {
+          markSaved();
+          showToast(error.message);
+        }
+      }
+
+      async function deleteSelectedClip() {
+        const found = currentSelection();
+        if (!found) return;
+        try {
+          markSaved('saving');
+          const result = await api(`/api/project/clip/${encodeURIComponent(found.clip.id)}`, {method: 'DELETE'});
+          state.selectedClipId = null;
+          applyProject(result.project, false);
+          markSaved();
+          setInspectorPane('generate');
+          showToast('Linked Audio/MIDI clip pair deleted');
+        } catch (error) {
+          markSaved();
+          showToast(error.message);
+        }
+      }
+
+      function setInspectorPane(pane) {
+        const generate = pane === 'generate';
+        $('#generate-pane').hidden = !generate;
+        $('#inspector-pane').hidden = generate;
+        $('#generate-tab').classList.toggle('active', generate);
+        $('#inspector-tab').classList.toggle('active', !generate);
+      }
+
+      async function watchJob(jobId) {
+        while (true) {
+          const job = await api(`/api/jobs/${encodeURIComponent(jobId)}`);
+          $('#queue-status').textContent = labels[job.status] || job.status;
+          $('#progress-value').style.width = `${job.progress || 0}%`;
+          $('#queue-note').textContent = job.message || '';
+          $('#clip-status').textContent = labels[job.status] || job.status;
+          $('#queue-time').textContent = job.status === 'ready' ? `${job.result.generation_seconds}s` : job.job_id.slice(-6);
+          if (job.status === 'ready') {
+            $('#queue-note').textContent = `WAV ${job.result.audio_bytes} bytes · MIDI ${job.result.midi_bytes} bytes · ${job.result.device}`;
+            await loadProject(jobId);
+            markSaved();
+            showToast('Audio generated, linked, and inserted into the timeline.');
+            return job;
+          }
+          if (job.status === 'failed') throw new Error(job.error || 'Inference failed');
+          await new Promise((resolve) => setTimeout(resolve, 250));
+        }
+      }
+
+      async function submitGeneration(event) {
+        event.preventDefault();
+        const button = $('#generate-button');
+        button.disabled = true;
+        button.textContent = 'Queued…';
+        $('#queue-status').textContent = 'Queued';
+        $('#clip-status').textContent = 'Queued';
+        $('#queue-note').textContent = 'Submitting one job to the single inference worker…';
+        $('#progress-value').style.width = '2%';
+        try {
+          const targetValue = $('#target').value;
+          const response = await api('/api/jobs', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({prompt: $('#prompt').value, duration_seconds: Number($('#duration').value), target_bars: targetValue === 'free' ? null : Number(targetValue), steps: 20})});
+          await watchJob(response.job_id);
+        } catch (error) {
+          $('#queue-status').textContent = 'Failed';
+          $('#clip-status').textContent = 'Failed';
+          $('#queue-note').textContent = error.message;
+          $('#progress-value').style.width = '0%';
+          showToast(`Generation failed: ${error.message}`);
+        } finally {
+          button.disabled = false;
+          button.innerHTML = 'Generate Audio <span class="shortcut">⌘ ↵</span>';
+        }
+      }
+
+      async function loadRuntime() {
+        try {
+          const [health, runtime] = await Promise.all([api('/api/health'), api('/api/runtime')]);
+          const fixture = runtime.device === 'fixture';
+          const isColab = runtime.deployment === 'colab-t4';
+          $('#runtime-pill').textContent = fixture ? 'LOCAL · FIXTURE' : (isColab ? 'COLAB T4 · HTTPS' : `LOCAL · ${runtime.device.toUpperCase()}`);
+          $('#runtime-pill').classList.add('ready');
+          if (isColab) $('#runtime-pill').classList.add('remote');
+          $('#health-dot').classList.add('ok');
+          $('#health-text').textContent = health.ok ? 'Studio server ready' : 'Studio server warning';
+          $('#runtime-text').textContent = `${runtime.device_name} · ${runtime.deployment}`;
+        } catch (error) {
+          $('#runtime-pill').textContent = 'SERVER OFFLINE';
+          $('#health-dot').classList.add('warn');
+          $('#health-text').textContent = 'Server unavailable';
+          $('#runtime-text').textContent = 'Check local or Colab deployment';
+        }
+      }
+
+      $('#play-button').addEventListener('click', togglePlayback);
+      $('#stop-button').addEventListener('click', () => stopPlayback(true));
+      $('#return-start').addEventListener('click', () => { $('#preview-audio').currentTime = 0; syncTransport(); });
+      $('#previous-bar').addEventListener('click', () => {
+        const bpm = Number(state.project?.bpm || 120);
+        $('#preview-audio').currentTime = Math.max(0, Number($('#preview-audio').currentTime || 0) - 4 * 60 / bpm);
+        syncTransport();
+      });
+      $('#preview-audio').addEventListener('timeupdate', syncTransport);
+      $('#preview-audio').addEventListener('ended', () => stopPlayback(false));
+      $('#waveform-play').addEventListener('click', togglePlayback);
+      $('#export-button').addEventListener('click', exportProject);
+      $('#generate-form').addEventListener('submit', submitGeneration);
+      $('#clip-form').addEventListener('submit', saveClipForm);
+      $('#delete-clip').addEventListener('click', deleteSelectedClip);
+      $('#add-track').addEventListener('click', () => createTrack('audio'));
+      $('#new-track').addEventListener('click', () => createTrack('midi'));
+      $('#zoom-control').addEventListener('input', (event) => applyZoom(event.target.value));
+      $('#snap-button').addEventListener('click', () => {
+        const options = [{value: .25, label: '1/16'}, {value: .5, label: '1/8'}, {value: 1, label: '1/4'}, {value: 0, label: 'OFF'}];
+        const index = options.findIndex((option) => option.value === state.snapBeats);
+        const next = options[(index + 1) % options.length];
+        state.snapBeats = next.value;
+        $('#snap-button').textContent = `SNAP ${next.label}`;
+        showToast(`Snap ${next.label}`);
+      });
+      document.querySelectorAll('.segment').forEach((button) => button.addEventListener('click', () => {
+        state.mode = button.dataset.mode;
+        document.querySelectorAll('.segment').forEach((item) => item.classList.toggle('active', item === button));
+        $('.timeline').dataset.mode = state.mode;
+        showToast(state.mode === 'arrange' ? 'Arrange mode: move and resize clips' : 'Clip mode: edit the selected clip');
+      }));
+      document.querySelectorAll('.editor-tab').forEach((tab) => tab.addEventListener('click', () => {
+        state.editor = tab.dataset.editor;
+        renderEditor();
+      }));
+      document.querySelectorAll('.inspector-tab').forEach((tab) => tab.addEventListener('click', () => setInspectorPane(tab.dataset.pane)));
+
+      window.addEventListener('keydown', (event) => {
+        const tag = event.target?.tagName;
+        const typing = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+        if (event.code === 'Space' && !typing) { event.preventDefault(); togglePlayback(); }
+        if ((event.key === 'g' || event.key === 'G') && !typing) { event.preventDefault(); setInspectorPane('generate'); $('#prompt').focus(); }
+        if ((event.key === 'q' || event.key === 'Q') && !typing) {
+          const found = currentSelection();
+          if (found?.clip.kind === 'midi') {
+            const notes = (found.clip.notes || []).map((note) => ({...note, start_beat: quantize(Number(note.start_beat || 0)), duration_beats: Math.max(state.snapBeats || .25, quantize(Number(note.duration_beats || .25)))}));
+            persistMidiNotes(found.clip, notes);
+          } else showToast('Select a MIDI clip to quantize');
+        }
+      });
+
+      Promise.all([loadRuntime(), loadProject()]).catch((error) => showToast(error.message));
+    })();
   </script>
 </body>
 </html>
