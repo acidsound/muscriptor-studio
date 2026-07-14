@@ -43,14 +43,14 @@ MuScriptor Studio is fundamentally a **personal desktop application**.
 
 - Use a local GPU when one is available.
 - Keep a CPU fallback so the project remains usable without a GPU.
-- Offer Colab T4 as an optional remote GPU provider for users who want temporary or low-cost acceleration.
-- Keep the Studio UI, project format, clip model, and job contract provider-neutral.
+- Also provide a Colab T4 deployment that runs the Studio web app and model runtime on the T4 and exposes it through an HTTPS URL.
+- Keep the Studio UI, project format, clip model, and job contract independent from the deployment target.
 
-The default user experience should not require an account, a cloud deployment, or an always-on remote server. See [Runtime Modes](docs/runtime-modes.md) for the execution contract and capability policy.
+The default user experience should not require an account, a cloud deployment, or an always-on remote server. Colab is an additional way to host the same web app for temporary remote access. See [Deployment and Runtime Modes](docs/runtime-modes.md) for the execution and exposure model.
 
 ## Current status
 
-The model integration has been functionally validated on a real Colab Tesla T4 as the first remote GPU provider:
+The model integration has been functionally validated on a real Colab Tesla T4:
 
 - `stabilityai/stable-audio-open-1.0` and `MuScriptor/muscriptor-medium` loaded on the same GPU
 - 4-second and 8-second Stable Audio generation completed
@@ -58,38 +58,36 @@ The model integration has been functionally validated on a real Colab Tesla T4 a
 - Audio generation and transcription also ran concurrently in a smoke test
 - The tested path used one generation/transcription job at a time and 20 inference steps
 
-The local GPU and CPU paths are product requirements. Their performance and model-specific compatibility still need to be measured separately rather than inferred from the Colab result.
+The local GPU and CPU paths are product requirements. Their performance and model-specific compatibility still need to be measured separately rather than inferred from the Colab result. The Colab HTTPS web-app deployment is the next integration milestone; the model smoke test alone does not verify the complete browser-accessible deployment.
 
 This repository is the product workspace. The upstream model fork is maintained separately at [`acidsound/muscriptor`](https://github.com/acidsound/muscriptor), currently using the `ui-improvements` branch for the verified model/UI work.
 
 ## Planned architecture
 
+The application core is shared across deployment targets. Only the host and local execution backend change.
+
 ```text
-┌─────────────────────────────────────────────────────────────┐
-│ Studio UI                                                     │
-│ Arrangement · Audio Clips · MIDI Clips · Piano Roll           │
-└──────────────────────────────┬──────────────────────────────┘
-                               │
-                 Provider-neutral Project / Job API
-                               │
-        ┌──────────────────────┼──────────────────────┐
-        │                      │                      │
-  Local GPU runtime       Local CPU runtime       Colab T4 runtime
-  CUDA/MPS as available   compatibility fallback  optional remote GPU
-        │                      │                      │
-        └──────────────────────┴──────────────────────┘
-                               │
-        ┌──────────────────────┴──────────────────────┐
-        │                                             │
- Stable Audio runtime                         MuScriptor runtime
- Audio generation                              Audio → MIDI
-        │                                             │
-        └──────────────────────┬──────────────────────┘
-                               │
-                    WAV / MIDI / Project export
+                         ┌──────────────────────────────┐
+                         │ Shared Studio application     │
+                         │ Timeline · Audio · MIDI      │
+                         │ Piano Roll · Project / Jobs  │
+                         └──────────────┬───────────────┘
+                                        │
+          ┌─────────────────────────────┴─────────────────────────────┐
+          │                                                           │
+┌─────────┴─────────┐                                     ┌─────────────┴─────────────┐
+│ Desktop deployment │                                     │ Colab T4 deployment       │
+│ Browser → localhost│                                     │ Browser → HTTPS URL       │
+│ Studio server      │                                     │ HTTPS tunnel / ingress    │
+│ Local GPU or CPU   │                                     │ Studio server on T4       │
+└─────────┬─────────┘                                     │ Stable Audio + MuScriptor │
+          │                                               └─────────────┬─────────────┘
+          └───────────────────────┬─────────────────────────────────────┘
+                                  │
+                   WAV / MIDI / Project storage and export
 ```
 
-The first implementation should keep provider selection explicit but simple: `Auto` chooses the best available local backend, while `Colab T4` is selected intentionally. GPU work remains conservative with one Stable Audio generation at a time, serialized variations, and clear job states in the UI.
+Inside either deployment, the runtime selects a local GPU when available and falls back to CPU when necessary. Colab is not a runtime selector inside the local Studio; it is a separate way to launch and expose the same web app. The first implementation should keep GPU work conservative with one Stable Audio generation at a time, serialized variations, and clear job states in the UI.
 
 ## Initial roadmap
 
@@ -101,9 +99,10 @@ The first implementation should keep provider selection explicit but simple: `Au
 - [ ] Reuse and integrate the MuScriptor Piano Roll editor
 - [ ] Link Audio and derived MIDI assets
 - [ ] Add WAV / MIDI / project export
-- [ ] Add provider detection and `Auto` runtime selection
-- [ ] Add local GPU runtime and CPU fallback smoke tests
-- [ ] Add explicit Colab T4 runtime provider and smoke tests
+- [ ] Add local hardware detection and GPU/CPU runtime selection
+- [ ] Add local desktop web-app launch and browser workflow
+- [ ] Add Colab T4 deployment script: build, start, HTTPS tunnel, health check
+- [ ] Add secure/persistent remote-access option beyond unauthenticated temporary tunnels
 - [ ] Stress-test longer clips, higher inference steps, and queue behavior
 
 ## Repository layout
@@ -122,7 +121,8 @@ The first implementation should keep provider selection explicit but simple: `Au
 - Never commit Hugging Face tokens, `.env` files, cookies, or access credentials.
 - Generated audio, MIDI, model caches, checkpoints, and runtime logs stay outside Git by default.
 - Do not put raw transcripts or private project assets in public issues or pull requests.
-- Use short-lived runtime credentials and stop temporary GPU sessions after validation.
+- A temporary HTTPS tunnel may be publicly reachable and unauthenticated; use it only for controlled testing until an authentication and access-control layer is implemented.
+- Use short-lived runtime credentials and stop temporary Colab sessions and tunnels after validation.
 
 ## Development notes
 
