@@ -37,15 +37,28 @@ MuScriptor Studio is designed as a **DAW with AI inside**, not as a generic AI d
 
 See [the design language document](docs/design-language.md) for the initial visual and interaction system.
 
+## Runtime principle: local-first
+
+MuScriptor Studio is fundamentally a **personal desktop application**.
+
+- Use a local GPU when one is available.
+- Keep a CPU fallback so the project remains usable without a GPU.
+- Offer Colab T4 as an optional remote GPU provider for users who want temporary or low-cost acceleration.
+- Keep the Studio UI, project format, clip model, and job contract provider-neutral.
+
+The default user experience should not require an account, a cloud deployment, or an always-on remote server. See [Runtime Modes](docs/runtime-modes.md) for the execution contract and capability policy.
+
 ## Current status
 
-The model integration has been functionally validated on a real Colab Tesla T4:
+The model integration has been functionally validated on a real Colab Tesla T4 as the first remote GPU provider:
 
 - `stabilityai/stable-audio-open-1.0` and `MuScriptor/muscriptor-medium` loaded on the same GPU
 - 4-second and 8-second Stable Audio generation completed
 - Generated WAV passed to MuScriptor for MIDI extraction
 - Audio generation and transcription also ran concurrently in a smoke test
 - The tested path used one generation/transcription job at a time and 20 inference steps
+
+The local GPU and CPU paths are product requirements. Their performance and model-specific compatibility still need to be measured separately rather than inferred from the Colab result.
 
 This repository is the product workspace. The upstream model fork is maintained separately at [`acidsound/muscriptor`](https://github.com/acidsound/muscriptor), currently using the `ui-improvements` branch for the verified model/UI work.
 
@@ -57,7 +70,14 @@ This repository is the product workspace. The upstream model fork is maintained 
 │ Arrangement · Audio Clips · MIDI Clips · Piano Roll           │
 └──────────────────────────────┬──────────────────────────────┘
                                │
-                 Project / Clip / Job API
+                 Provider-neutral Project / Job API
+                               │
+        ┌──────────────────────┼──────────────────────┐
+        │                      │                      │
+  Local GPU runtime       Local CPU runtime       Colab T4 runtime
+  CUDA/MPS as available   compatibility fallback  optional remote GPU
+        │                      │                      │
+        └──────────────────────┴──────────────────────┘
                                │
         ┌──────────────────────┴──────────────────────┐
         │                                             │
@@ -69,7 +89,7 @@ This repository is the product workspace. The upstream model fork is maintained 
                     WAV / MIDI / Project export
 ```
 
-The first implementation should keep the GPU workflow explicit and conservative: one Stable Audio generation at a time, serialized variations, and clear job states in the UI.
+The first implementation should keep provider selection explicit but simple: `Auto` chooses the best available local backend, while `Colab T4` is selected intentionally. GPU work remains conservative with one Stable Audio generation at a time, serialized variations, and clear job states in the UI.
 
 ## Initial roadmap
 
@@ -81,7 +101,9 @@ The first implementation should keep the GPU workflow explicit and conservative:
 - [ ] Reuse and integrate the MuScriptor Piano Roll editor
 - [ ] Link Audio and derived MIDI assets
 - [ ] Add WAV / MIDI / project export
-- [ ] Add repeatable Colab T4 runtime setup and smoke tests
+- [ ] Add provider detection and `Auto` runtime selection
+- [ ] Add local GPU runtime and CPU fallback smoke tests
+- [ ] Add explicit Colab T4 runtime provider and smoke tests
 - [ ] Stress-test longer clips, higher inference steps, and queue behavior
 
 ## Repository layout
@@ -90,7 +112,8 @@ The first implementation should keep the GPU workflow explicit and conservative:
 .
 ├── README.md
 ├── docs/
-│   └── design-language.md
+│   ├── design-language.md
+│   └── runtime-modes.md
 └── (Studio application code will be added next)
 ```
 

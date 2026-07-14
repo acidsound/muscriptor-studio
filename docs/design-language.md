@@ -163,7 +163,15 @@ Use concise production terminology:
 
 Avoid vague AI copy such as “Unlock,” “Enhance,” “Magic,” or “Transform.”
 
-## GPU-aware interaction
+## Runtime-aware interaction
+
+The product is local-first, so the UI should present execution capability without making hardware the main subject.
+
+```text
+Runtime: Auto · Local GPU available
+Runtime: Auto · CPU fallback
+Runtime: Colab T4 · Connected
+```
 
 The tested T4 configuration has limited headroom after both models are resident. The UI should make serialized work feel intentional:
 
@@ -173,7 +181,7 @@ Variation 2  Queued
 Variation 3  Queued
 ```
 
-Do not imply unlimited parallel generation. Show clear states for queued, generating, extracting MIDI, ready, and failed jobs.
+Do not imply unlimited parallel generation. Show clear states for queued, generating, extracting MIDI, ready, and failed jobs. CPU mode should show an honest “may take longer” state rather than a spinner with no explanation. Colab should always be an explicit provider choice, not a silent fallback.
 
 ## First visual milestone
 
