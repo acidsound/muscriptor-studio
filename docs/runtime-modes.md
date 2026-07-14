@@ -89,7 +89,7 @@ The deployment script should:
 - verify browser-relevant API and WebSocket paths
 - stop the tunnel and runtime after cancellation or completion
 
-The current model smoke test validates the combined Stable Audio + MuScriptor path on a T4. It does not yet validate the complete browser-accessible HTTPS deployment; that is a separate integration milestone.
+A model-backed 4-second browser job has now been verified on the T4 path: Stable Audio produced a 44.1 kHz WAV, MuScriptor produced a MIDI artifact, and the browser displayed playback and download links. Longer durations, timeline insertion, and project-level export remain separate milestones.
 
 ## HTTPS exposure and security
 
@@ -131,24 +131,20 @@ The indicator describes where the current Studio session is running. It should n
 Inside either deployment, Stable Audio and MuScriptor use the same internal job lifecycle:
 
 ```text
-queued → generating → extracting-midi → ready
-                                  └→ failed / cancelled
+queued → loading_models → generating → transcribing → ready
+                                                     └→ failed / cancelled
 ```
 
-Example generation request:
+The current API is intentionally small and browser-pollable:
 
-```json
-{
-  "type": "audio-generation",
-  "prompt": "warm analog bass loop, 120 BPM, four bars",
-  "duration_seconds": 8,
-  "project_bpm": 120,
-  "seed": null,
-  "extract_midi": true
-}
+```text
+POST /api/jobs
+GET  /api/jobs/<job_id>
+GET  /api/artifacts/<job_id>/audio.wav
+GET  /api/artifacts/<job_id>/notes.mid
 ```
 
-The API is provisional. The important boundary is that the Studio UI does not need separate product logic for desktop and Colab deployments.
+The important boundary is that the Studio UI does not need separate product logic for desktop and Colab deployments.
 
 ## Data locality
 
@@ -189,13 +185,13 @@ GPU memory is not an unlimited concurrency pool. The validated T4 path had limit
 
 ### Colab T4 deployment
 
-- Allocate a T4 session
-- Install pinned dependencies
-- Inject credentials ephemerally
-- Start the complete Studio web app
-- Verify health/readiness locally in the runtime
-- Create the HTTPS tunnel
-- Open the returned URL from an external browser path
-- Verify frontend assets, API calls, WebSocket/streaming behavior, audio generation, MIDI extraction, and download/export
-- Confirm the URL does not expose secrets or internal paths
-- Stop the tunnel and Colab session
+- [x] Allocate a T4 session
+- [x] Install pinned dependencies
+- [x] Inject credentials ephemerally
+- [x] Start the complete Studio web app
+- [x] Verify health/readiness locally in the runtime
+- [x] Create the HTTPS tunnel
+- [x] Open the returned URL from an external browser path
+- [x] Verify frontend assets, API polling, audio generation, MIDI extraction, and download/export for a 4-second job
+- [x] Confirm the URL does not expose secrets or internal paths
+- [ ] Stop the tunnel and Colab session after the user is finished inspecting the deployment

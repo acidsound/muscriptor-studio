@@ -58,14 +58,18 @@ The model integration has been functionally validated on a real Colab Tesla T4:
 - Audio generation and transcription also ran concurrently in a smoke test
 - The tested path used one generation/transcription job at a time and 20 inference steps
 
-The first Studio shell has been validated as a browser-accessible web app on the Colab T4 deployment path:
+The Studio now has a real model-backed browser path on the Colab T4 deployment:
 
 - Studio server health returned `200` through the HTTPS URL
 - Browser loaded the arrangement timeline, Audio/MIDI clips, Piano Roll, and Generate panel
 - Runtime status displayed `COLAB T4 · HTTPS` and `Tesla T4 · colab-t4`
-- Generate prototype interaction completed through the browser and returned a ready state
+- A browser-submitted 4-second job reached `ready`
+- Stable Audio generation returned a 44.1 kHz WAV in `8.916s`
+- MuScriptor returned a MIDI artifact in the same job
+- Browser displayed an audio player and WAV/MIDI download links
+- Browser console errors: `0`
 
-The complete model-backed browser workflow is the next integration slice; the existing model smoke test and shell validation do not yet verify Stable Audio generation and MuScriptor extraction through the Studio UI.
+The current functional boundary is generation, WAV storage, MIDI extraction, polling, playback, and artifact download. Dynamic insertion into the arrangement timeline, non-destructive editing, and full project export remain next.
 
 This repository is the product workspace. The upstream model fork is maintained separately at [`acidsound/muscriptor`](https://github.com/acidsound/muscriptor), currently using the `ui-improvements` branch for the verified model/UI work.
 
@@ -96,22 +100,34 @@ The application core is shared across deployment targets. Only the host and loca
 
 Inside either deployment, the runtime selects a local GPU when available and falls back to CPU when necessary. Colab is not a runtime selector inside the local Studio; it is a separate way to launch and expose the same web app. The first implementation should keep GPU work conservative with one Stable Audio generation at a time, serialized variations, and clear job states in the UI.
 
-## Run the Studio shell locally
+## Run the Studio locally
 
-The first shell uses only Python's standard library for the server and has no frontend package-install step.
+The server uses Python's standard library for HTTP and loads the model runtime lazily when the first job is submitted. Install the model dependencies and configure `HF_TOKEN` before requesting real inference.
 
 ```bash
 python3 server.py --host 127.0.0.1 --port 7860 --deployment desktop
 ```
 
-Open `http://127.0.0.1:7860` in a browser. The shell exposes:
+Open `http://127.0.0.1:7860` in a browser. The server exposes:
 
 - `GET /api/health`
 - `GET /api/runtime`
 - `GET /api/project`
-- `POST /api/demo/generate` (prototype interaction only; model wiring comes next)
+- `POST /api/jobs`
+- `GET /api/jobs/<job_id>`
+- `GET /api/artifacts/<job_id>/audio.wav`
+- `GET /api/artifacts/<job_id>/notes.mid`
 
-## Run the shell on Colab T4
+A job runs through:
+
+```text
+queued → loading_models → generating → transcribing → ready
+                                             └→ failed
+```
+
+The T4 deployment uses a single worker to avoid unsafe VRAM concurrency.
+
+## Run the Studio on Colab T4
 
 Upload the repository files to `/content/muscriptor-studio`, then run the scripts in order:
 
@@ -136,17 +152,17 @@ The deployment scripts are intentionally separate from the model installation sc
 - [x] Create the Studio shell and dark design-token system
 - [x] Add local/Colab web-server launch path
 - [x] Validate Studio shell browser access through Colab T4 HTTPS
-- [ ] Build the arrangement timeline with Audio and MIDI lanes
-- [ ] Add the Generate Audio drawer and job states
-- [ ] Insert generated audio into the timeline
-- [ ] Connect MuScriptor transcription to generated clips
+- [x] Add real Stable Audio → WAV → MuScriptor → MIDI job
+- [x] Add browser job polling, audio preview, and WAV/MIDI artifact links
+- [ ] Build dynamic arrangement timeline insertion for generated clips
+- [ ] Add non-destructive Audio and MIDI editing
 - [ ] Reuse and integrate the MuScriptor Piano Roll editor
-- [ ] Link Audio and derived MIDI assets
-- [ ] Add WAV / MIDI / project export
+- [ ] Link Audio and derived MIDI assets in the project model
+- [ ] Add WAV / MIDI / project export beyond individual artifacts
 - [ ] Add local hardware detection and GPU/CPU runtime selection
-- [ ] Add full Colab T4 browser E2E verification
-- [ ] Add secure/persistent remote-access option beyond unauthenticated temporary tunnels
+- [x] Validate model-backed Colab T4 browser E2E for a 4-second job
 - [ ] Stress-test longer clips, higher inference steps, and queue behavior
+- [ ] Add secure/persistent remote-access option beyond unauthenticated temporary tunnels
 
 ## Repository layout
 
@@ -154,6 +170,7 @@ The deployment scripts are intentionally separate from the model installation sc
 .
 ├── README.md
 ├── server.py
+├── model_runtime.py
 ├── web/
 │   └── index.html
 ├── scripts/

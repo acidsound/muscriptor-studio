@@ -192,6 +192,10 @@
     .card-details { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
     .card-details span { display: block; color: var(--faint); font: 9px var(--mono); }
     .card-details strong { display: block; margin-top: 3px; color: var(--muted); font-size: 11px; font-weight: 500; }
+    .preview-audio { display: none; width: 100%; height: 32px; margin-top: 13px; accent-color: var(--audio); }
+    .artifact-links { display: none; gap: 7px; margin-top: 10px; }
+    .artifact-links a { flex: 1; display: inline-flex; justify-content: center; align-items: center; min-height: 27px; border: 1px solid var(--line); border-radius: 4px; color: var(--muted); background: var(--surface-2); text-decoration: none; font: 9px var(--mono); }
+    .artifact-links a:hover { color: var(--text); border-color: var(--line-strong); }
 
     .statusbar { justify-content: space-between; gap: 10px; padding: 0 12px; border-top: 1px solid var(--line); background: #0e1214; color: var(--faint); font: 9px var(--mono); }
     .statusbar-left, .statusbar-right { display: flex; align-items: center; gap: 12px; min-width: 0; }
@@ -309,7 +313,7 @@
             <label class="field-label" for="prompt">DESCRIPTION</label>
             <textarea id="prompt" placeholder="warm analog bass loop, 120 BPM, four bars">warm analog bass loop, 120 BPM, four bars</textarea>
             <div class="field-row">
-              <label><span class="field-label">DURATION</span><select id="duration"><option>4 sec</option><option selected>8 sec</option><option>16 sec · experimental</option></select></label>
+              <label><span class="field-label">DURATION</span><select id="duration"><option value="4">4 sec</option><option value="8" selected>8 sec</option><option value="16">16 sec · experimental</option></select></label>
               <label><span class="field-label">TARGET</span><select><option selected>4 bars</option><option>8 bars</option><option>Free length</option></select></label>
             </div>
             <button class="button primary generate-button" type="submit" id="generate-button">Generate Audio <span class="shortcut">⌘ ↵</span></button>
@@ -317,12 +321,14 @@
           <div class="queue-card">
             <div class="queue-line"><strong id="queue-status">Ready to generate</strong><span id="queue-time">—</span></div>
             <div class="progress-track"><div class="progress-value" id="progress-value"></div></div>
-            <div class="queue-note" id="queue-note">Model job wiring comes next. This first slice validates the Studio interaction and deployment shell.</div>
+            <div class="queue-note" id="queue-note">The first job loads both models on the T4, then generates WAV and extracts MIDI.</div>
           </div>
           <div class="selected-card">
             <div class="eyebrow">SELECTED CLIP</div>
             <div class="card-title"><span>AI Bass Loop</span><span class="deployment-chip">AUDIO</span></div>
-            <div class="card-details"><div><span>MODEL</span><strong>Stable Audio Open</strong></div><div><span>STATUS</span><strong id="clip-status">Ready</strong></div><div><span>LINK</span><strong>Audio ↔ MIDI</strong></div><div><span>LENGTH</span><strong>8.0 seconds</strong></div></div>
+            <div class="card-details"><div><span>MODEL</span><strong>Stable Audio Open</strong></div><div><span>STATUS</span><strong id="clip-status">Ready</strong></div><div><span>LINK</span><strong>Audio ↔ MIDI</strong></div><div><span>LENGTH</span><strong id="clip-length">8.0 seconds</strong></div></div>
+            <audio class="preview-audio" id="preview-audio" controls preload="metadata"></audio>
+            <div class="artifact-links" id="artifact-links"><a id="audio-download" href="#" download="audio.wav">WAV</a><a id="midi-download" href="#" download="notes.mid">MIDI</a></div>
           </div>
         </div>
       </aside>
@@ -330,7 +336,7 @@
 
     <footer class="statusbar">
       <div class="statusbar-left"><span class="status-dot" id="health-dot"></span><span id="health-text">Checking server…</span><span id="runtime-text">Runtime pending</span></div>
-      <div class="statusbar-right"><span>SPACE Play</span><span>G Generate</span><span>Q Quantize</span><span>v0.1 shell</span></div>
+      <div class="statusbar-right"><span>SPACE Play</span><span>G Generate</span><span>Q Quantize</span><span>v0.2 inference</span></div>
     </footer>
   </div>
   <div class="toast" id="toast" role="status"></div>
@@ -389,7 +395,50 @@
 
     $('#add-track').addEventListener('click', () => showToast('Track creation is next in the Studio slice.'));
     $('#new-track').addEventListener('click', () => showToast('Track creation is next in the Studio slice.'));
-    $('#export-button').addEventListener('click', () => showToast('Export will be connected after the project model is in place.'));
+    $('#export-button').addEventListener('click', () => {
+      const link = $('#audio-download');
+      if (link.href && !link.href.endsWith('#')) link.click();
+      else showToast('Generate an audio clip first.');
+    });
+
+    async function watchJob(jobId) {
+      const status = $('#queue-status');
+      const note = $('#queue-note');
+      const progress = $('#progress-value');
+      const clipStatus = $('#clip-status');
+      while (true) {
+        const response = await fetch(`/api/jobs/${jobId}`, {cache: 'no-store'});
+        const job = await response.json();
+        if (!response.ok) throw new Error(job.error || 'Unable to read job status');
+        const labels = {
+          queued: 'Queued',
+          loading_models: 'Loading models',
+          generating: 'Generating audio',
+          transcribing: 'Extracting MIDI',
+          ready: 'Ready',
+          failed: 'Failed'
+        };
+        status.textContent = labels[job.status] || job.status;
+        progress.style.width = `${job.progress || 0}%`;
+        note.textContent = job.message || '';
+        clipStatus.textContent = labels[job.status] || job.status;
+        $('#queue-time').textContent = job.status === 'ready' ? `${job.result.generation_seconds}s` : job.job_id.slice(-6);
+        if (job.status === 'ready') {
+          const result = job.result;
+          $('#preview-audio').src = result.audio_url;
+          $('#preview-audio').style.display = 'block';
+          $('#audio-download').href = result.audio_url;
+          $('#midi-download').href = result.midi_url;
+          $('#artifact-links').style.display = 'flex';
+          $('#clip-length').textContent = `${result.duration_seconds}s`;
+          note.textContent = `WAV ${result.audio_bytes} bytes · MIDI ${result.midi_bytes} bytes · ${result.device}`;
+          showToast('Audio generated and MIDI extracted.');
+          return job;
+        }
+        if (job.status === 'failed') throw new Error(job.error || 'Inference failed');
+        await new Promise((resolve) => setTimeout(resolve, 900));
+      }
+    }
 
     $('#generate-form').addEventListener('submit', async (event) => {
       event.preventDefault();
@@ -398,31 +447,40 @@
       const note = $('#queue-note');
       const progress = $('#progress-value');
       const clipStatus = $('#clip-status');
+      const audio = $('#preview-audio');
       button.disabled = true;
-      button.textContent = 'Generating…';
-      status.textContent = 'Prototype job running';
-      clipStatus.textContent = 'Generating';
-      note.textContent = 'The shell is exercising the real server/job boundary. Model inference is the next slice.';
-      progress.style.width = '24%';
+      button.textContent = 'Queued…';
+      status.textContent = 'Queued';
+      clipStatus.textContent = 'Queued';
+      note.textContent = 'Submitting one job to the T4 worker…';
+      progress.style.width = '2%';
+      audio.pause();
+      audio.removeAttribute('src');
+      audio.load();
+      $('#artifact-links').style.display = 'none';
       try {
-        await fetch('/api/demo/generate', {
+        const response = await fetch('/api/jobs', {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({prompt: $('#prompt').value, duration: $('#duration').value})
+          body: JSON.stringify({
+            prompt: $('#prompt').value,
+            duration_seconds: Number($('#duration').value),
+            steps: 20
+          })
         });
-      } catch (_) {
-        note.textContent = 'Server response unavailable; the UI state is still local.';
-      }
-      setTimeout(() => {
-        progress.style.width = '100%';
-        status.textContent = 'Prototype ready';
-        $('#queue-time').textContent = 'demo';
-        clipStatus.textContent = 'Ready';
-        note.textContent = 'Ready for Stable Audio job wiring.';
+        const job = await response.json();
+        if (!response.ok) throw new Error(job.error || 'Unable to create job');
+        await watchJob(job.job_id);
+      } catch (error) {
+        status.textContent = 'Failed';
+        clipStatus.textContent = 'Failed';
+        note.textContent = error.message;
+        progress.style.width = '0%';
+        showToast(`Generation failed: ${error.message}`);
+      } finally {
         button.disabled = false;
         button.innerHTML = 'Generate Audio <span class="shortcut">⌘ ↵</span>';
-        showToast('Prototype job completed — ready for model wiring.');
-      }, 1250);
+      }
     });
 
     async function loadRuntime() {

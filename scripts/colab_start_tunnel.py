@@ -26,7 +26,7 @@ if PID_FILE.is_file():
 
 log = LOG_FILE.open("w", encoding="utf-8")
 process = subprocess.Popen(
-    [str(BINARY), "tunnel", "--url", "http://127.0.0.1:7860", "--no-autoupdate"],
+    [str(BINARY), "tunnel", "--url", "http://127.0.0.1:7860", "--no-autoupdate", "--protocol", "http2"],
     stdout=log,
     stderr=subprocess.STDOUT,
     start_new_session=True,

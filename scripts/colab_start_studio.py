@@ -10,6 +10,7 @@ from pathlib import Path
 ROOT = Path("/content/muscriptor-studio")
 PID_FILE = Path("/content/muscriptor-studio.pid")
 LOG_FILE = Path("/content/muscriptor-studio.log")
+TOKEN_FILE = Path("/content/.hf_token")
 PORT = os.environ.get("STUDIO_PORT", "7860")
 
 if PID_FILE.is_file():
@@ -19,6 +20,11 @@ if PID_FILE.is_file():
         pass
 
 log = LOG_FILE.open("w", encoding="utf-8")
+env = os.environ.copy()
+if TOKEN_FILE.is_file():
+    env["HF_TOKEN"] = TOKEN_FILE.read_text(encoding="utf-8").strip()
+    TOKEN_FILE.unlink(missing_ok=True)
+
 process = subprocess.Popen(
     [
         sys.executable,
@@ -31,7 +37,7 @@ process = subprocess.Popen(
         "colab-t4",
     ],
     cwd=ROOT,
-    env=os.environ.copy(),
+    env=env,
     stdout=log,
     stderr=subprocess.STDOUT,
     start_new_session=True,
