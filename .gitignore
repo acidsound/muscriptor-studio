@@ -1,0 +1,51 @@
+# Environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+credentials.json
+
+# Python
+__pycache__/
+*.py[cod]
+*.so
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# Node / frontend
+node_modules/
+dist/
+build/
+.vite/
+.next/
+
+# Generated media, models, and runtime artifacts
+outputs/
+artifacts/
+checkpoints/
+models/
+*.ckpt
+*.safetensors
+*.pt
+*.pth
+*.bin
+*.gguf
+*.wav
+*.mp3
+*.flac
+*.ogg
+*.mid
+*.midi
+
+# Logs and local tooling
+*.log
+.DS_Store
+.vscode/
+.idea/
+
+# Local Hermes / agent state
+.hermes/
